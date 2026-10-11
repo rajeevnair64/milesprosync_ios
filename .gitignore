@@ -1,0 +1,12 @@
+.DS_Store
+/.build
+/Packages
+xcuserdata/
+DerivedData/
+.netrc
+
+# XcodeGen-generated project — regenerate with `xcodegen generate` from project.yml
+/MilesProSync.xcodeproj
+
+# SPM resolved dependency checkout, regenerated from Package.resolved
+.swiftpm/
