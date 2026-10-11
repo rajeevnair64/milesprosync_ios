@@ -59,6 +59,7 @@ struct TripSyncServiceTests {
     }
 
     @Test func uploadsFinishedTripsAndMarksThemUploaded() async throws {
+        await server.enqueueOK()
         let finished = try insertTrip()
         try insertTrip(inProgress: true)
 
@@ -77,6 +78,7 @@ struct TripSyncServiceTests {
     }
 
     @Test func editAfterUploadMakesTripPendingAgain() async throws {
+        await server.enqueueOK(2)
         let id = try insertTrip()
         await service.syncPendingTrips()
 
@@ -90,6 +92,7 @@ struct TripSyncServiceTests {
     }
 
     @Test func editDuringUploadStaysPending() async throws {
+        await server.enqueueOK()
         let id = try insertTrip()
         let container = container
         await server.setOnRequest { _ in
@@ -121,6 +124,7 @@ struct TripSyncServiceTests {
     }
 
     @Test func largeBacklogUploadsInBatches() async throws {
+        await server.enqueueOK(12)
         let context = ModelContext(container)
         for _ in 0..<120 {
             context.insert(Trip(
@@ -138,6 +142,7 @@ struct TripSyncServiceTests {
     }
 
     @Test func deletedTripUploadsWithDeletionTime() async throws {
+        await server.enqueueOK(2)
         let id = try insertTrip()
         await service.syncPendingTrips()
 
@@ -178,6 +183,7 @@ struct TripSyncServiceTests {
     }
 
     @Test func successfulSyncSchedulesNoRetry() async throws {
+        await server.enqueueOK()
         try insertTrip()
         await service.sync()
         #expect(retries.scheduledCount == 0)

@@ -11,15 +11,16 @@ import SwiftData
 /// CoreMotion and `TripRecorder`.
 @Observable
 @MainActor
-final class DriveDetectionService: NSObject {
+final class DriveDetectionService {
     private(set) var authorizationStatus: CLAuthorizationStatus
     var phase: DriveStateMachine.Phase { machine.phase }
     /// Called once a finished trip is fully saved, addresses included (e.g. to upload it).
     @ObservationIgnored var onTripFinished: (@MainActor () -> Void)?
 
-    private let locationManager = CLLocationManager()
+    private let locationManager: any LocationManaging
     private let motionActivityManager = CMMotionActivityManager()
     private let recorder: TripRecorder
+    private let reverseGeocode: @Sendable (Double, Double) async -> String?
 
     private var machine = DriveStateMachine()
     private var hasStarted = false
@@ -36,13 +37,25 @@ final class DriveDetectionService: NSObject {
     /// trip writes land in the order they were emitted even though each one suspends.
     private var actionQueue: Task<Void, Never>?
 
-    init(modelContainer: ModelContainer) {
+    /// `locationManager` and `reverseGeocode` default to the system's; tests pass scripted ones.
+    init(
+        modelContainer: ModelContainer,
+        locationManager: (any LocationManaging)? = nil,
+        reverseGeocode: @escaping @Sendable (Double, Double) async -> String? = { latitude, longitude in
+            await GeocodingService.shared.reverseGeocode(latitude: latitude, longitude: longitude)
+        }
+    ) {
+        let locationManager = locationManager ?? SystemLocationManager()
+        self.locationManager = locationManager
+        self.reverseGeocode = reverseGeocode
         self.recorder = TripRecorder(modelContainer: modelContainer)
-        self.authorizationStatus = CLLocationManager().authorizationStatus
-        super.init()
-        locationManager.delegate = self
-        locationManager.allowsBackgroundLocationUpdates = true
-        locationManager.pausesLocationUpdatesAutomatically = false
+        self.authorizationStatus = locationManager.authorizationStatus
+        locationManager.events = self
+    }
+
+    /// Completes once everything queued so far (recovery, location fixes, region exits) has run.
+    func waitForPendingActions() async {
+        await actionQueue?.value
     }
 
     // MARK: - Lifecycle
@@ -128,7 +141,7 @@ final class DriveDetectionService: NSObject {
         locationManager.stopMonitoringSignificantLocationChanges()
         stopMonitoringParkedRegion()
         stopMonitoringRouteRegion()
-        locationManager.delegate = nil
+        locationManager.events = nil
         motionActivityManager.stopActivityUpdates()
         onTripFinished = nil
     }
@@ -162,41 +175,37 @@ final class DriveDetectionService: NSObject {
     private func monitorParkedRegion() {
         stopMonitoringParkedRegion()
         guard let anchor = machine.idleAnchor,
-              CLLocationManager.isMonitoringAvailable(for: CLCircularRegion.self) else { return }
+              locationManager.isRegionMonitoringAvailable else { return }
         let region = CLCircularRegion(
             center: anchor.coordinate, radius: Self.parkedRegionRadius, identifier: Self.parkedRegionID
         )
         region.notifyOnEntry = false
         region.notifyOnExit = true
-        locationManager.startMonitoring(for: region)
+        locationManager.startMonitoring(region: region)
     }
 
     /// Keeps the route region within `routeRegionRecenter` of the car. Re-registering with the
     /// same identifier replaces the earlier region.
     private func followRoute(with location: CLLocation) {
         guard !isStopped, location.horizontalAccuracy >= 0,
-              CLLocationManager.isMonitoringAvailable(for: CLCircularRegion.self) else { return }
+              locationManager.isRegionMonitoringAvailable else { return }
         if let center = routeRegionCenter, location.distance(from: center) < Self.routeRegionRecenter { return }
         let region = CLCircularRegion(
             center: location.coordinate, radius: Self.routeRegionRadius, identifier: Self.routeRegionID
         )
         region.notifyOnEntry = false
         region.notifyOnExit = true
-        locationManager.startMonitoring(for: region)
+        locationManager.startMonitoring(region: region)
         routeRegionCenter = location
     }
 
     private func stopMonitoringRouteRegion() {
         routeRegionCenter = nil
-        for region in locationManager.monitoredRegions where region.identifier == Self.routeRegionID {
-            locationManager.stopMonitoring(for: region)
-        }
+        locationManager.stopMonitoring(regionIdentifier: Self.routeRegionID)
     }
 
     private func stopMonitoringParkedRegion() {
-        for region in locationManager.monitoredRegions where region.identifier == Self.parkedRegionID {
-            locationManager.stopMonitoring(for: region)
-        }
+        locationManager.stopMonitoring(regionIdentifier: Self.parkedRegionID)
     }
 
     private func parkedRegionExited(lastKnown: CLLocation?) {
@@ -214,10 +223,7 @@ final class DriveDetectionService: NSObject {
         // app if it's terminated mid-trip, so the in-progress trip can be resumed. Its coarse
         // fixes are kept off the route by the state machine's accuracy filter.
         locationManager.startMonitoringSignificantLocationChanges()
-        locationManager.desiredAccuracy = kCLLocationAccuracyBest
-        locationManager.activityType = .automotiveNavigation
-        locationManager.distanceFilter = kCLDistanceFilterNone
-        locationManager.startUpdatingLocation()
+        locationManager.startDrivingUpdates()
 
         guard CMMotionActivityManager.isActivityAvailable() else { return }
         motionActivityManager.startActivityUpdates(to: .main) { [weak self] activity in
@@ -294,36 +300,29 @@ final class DriveDetectionService: NSObject {
     private func lookUpAddresses(for tripID: PersistentIdentifier, start: CLLocationCoordinate2D, end: CLLocationCoordinate2D) async {
         // Sequential on purpose: reverse geocoding is rate-limited, and firing both at once
         // tends to get one of them rejected.
-        let startAddress = await GeocodingService.shared.reverseGeocode(latitude: start.latitude, longitude: start.longitude)
-        let endAddress = await GeocodingService.shared.reverseGeocode(latitude: end.latitude, longitude: end.longitude)
+        let startAddress = await reverseGeocode(start.latitude, start.longitude)
+        let endAddress = await reverseGeocode(end.latitude, end.longitude)
         await recorder.setAddresses(startAddress: startAddress, endAddress: endAddress, for: tripID)
     }
 }
 
-extension DriveDetectionService: CLLocationManagerDelegate {
-    nonisolated func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-        Task { @MainActor in
-            for location in locations {
-                self.process(location)
-            }
+extension DriveDetectionService: LocationManagerEvents {
+    func didUpdate(locations: [CLLocation]) {
+        for location in locations {
+            process(location)
         }
     }
 
-    nonisolated func locationManager(_ manager: CLLocationManager, didExitRegion region: CLRegion) {
-        guard region.identifier == Self.parkedRegionID else { return }
-        let lastKnown = manager.location
-        Task { @MainActor in
-            self.parkedRegionExited(lastKnown: lastKnown)
-        }
+    func didExitRegion(identifier: String, lastKnown: CLLocation?) {
+        // Leaving the route region needs no action: being relaunched is the point of it.
+        guard identifier == Self.parkedRegionID else { return }
+        parkedRegionExited(lastKnown: lastKnown)
     }
 
-    nonisolated func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
-        let status = manager.authorizationStatus
-        Task { @MainActor in
-            self.authorizationStatus = status
-            if self.wantsToRun {
-                self.start()
-            }
+    func didChangeAuthorization(_ status: CLAuthorizationStatus) {
+        authorizationStatus = status
+        if wantsToRun {
+            start()
         }
     }
 }

@@ -55,10 +55,10 @@ targets:
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         SWIFT_EMIT_LOC_STRINGS: true
         ENABLE_PREVIEWS: true
-        # Cloud sync: the website's https:// address (e.g. https://milestracker.example), whose API the
-        # app uploads to (see website/README.md). Leave empty to build without sync. The app holds no
-        # database credentials; only the server connects to the database.
-        SYNC_API_URL: ""
+        # Cloud sync: the website's https:// origin, whose API the app uploads to (the app appends
+        # api/v1/... itself; see website/README.md). Leave empty to build without sync. The app holds
+        # no database credentials; only the server connects to the database.
+        SYNC_API_URL: "https://milesprosync.com"
     entitlements:
       path: MilesProSync/MilesProSync.entitlements
       properties:

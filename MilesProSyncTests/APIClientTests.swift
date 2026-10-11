@@ -60,6 +60,7 @@ struct APIClientTests {
 
     @Test func upsertSendsBatchWithAuth() async throws {
         let server = FakeServer()
+        await server.enqueueOK()
         let client = APIClient(config: SyncFixtures.config, tokenStore: InMemoryTokenStore(SyncFixtures.session()), transport: server.transport)
 
         try await client.upsertTrips([payload(address: "1 Main St"), payload(address: nil)])
@@ -84,6 +85,7 @@ struct APIClientTests {
 
     @Test func upsertIncludesRouteOldestFirstAndDeletion() async throws {
         let server = FakeServer()
+        await server.enqueueOK()
         let client = APIClient(config: SyncFixtures.config, tokenStore: InMemoryTokenStore(SyncFixtures.session()), transport: server.transport)
 
         try await client.upsertTrips([payload(deleted: true)])
@@ -103,6 +105,7 @@ struct APIClientTests {
     @Test func expiringTokenIsRefreshedBeforeUpload() async throws {
         let server = FakeServer()
         await server.enqueue(200, SyncFixtures.tokenResponse(access: "access-2", refresh: "refresh-2"))
+        await server.enqueueOK()
         let store = InMemoryTokenStore(SyncFixtures.session(expiresIn: 10))
         let client = APIClient(config: SyncFixtures.config, tokenStore: store, transport: server.transport)
 
