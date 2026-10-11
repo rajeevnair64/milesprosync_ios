@@ -55,6 +55,7 @@ struct SettingsView: View {
                     NavigationLink("Privacy Policy") {
                         PrivacyPolicyView()
                     }
+                    LabeledContent("Version", value: AppSettings.versionText())
                 }
             }
             .navigationTitle("Settings")

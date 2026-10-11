@@ -27,6 +27,13 @@ enum AppSettings {
         }
         .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
 
+    /// "1.0 (2)": marketing version and build number, as shown in Settings → About.
+    static func versionText(bundle: Bundle = .main) -> String {
+        let version = bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
+        let build = bundle.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "?"
+        return "\(version) (\(build))"
+    }
+
     static func countryName(for code: String) -> String {
         Locale.current.localizedString(forRegionCode: code) ?? code
     }
