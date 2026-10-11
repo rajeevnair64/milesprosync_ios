@@ -27,7 +27,7 @@ struct SettingsView: View {
                 } header: {
                     Text("Plan")
                 } footer: {
-                    Text("Two months free, then $39.99 per year, $4.99 per month, or $109.99 once. Teams: $3.99 per user per month or $34.99 per year.")
+                    Text("Two months free, then $39.99 per year, $4.99 per month, or $109.99 once for 5 years (one person only). Teams: $3.99 per user per month or $34.99 per year.")
                 }
                 Section {
                     NavigationLink("Auto-Classification") {

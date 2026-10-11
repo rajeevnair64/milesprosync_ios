@@ -27,22 +27,22 @@ struct SubscriptionView: View {
                     )
                     PlanRow(id: ProductID.individual, title: "Monthly", fallbackPrice: "$4.99", per: "/month")
                     PlanRow(
-                        id: ProductID.lifetime, title: "Lifetime", fallbackPrice: "$109.99", per: " once",
+                        id: ProductID.fiveYear, title: "Pay once", fallbackPrice: "$109.99", per: " for 5 years",
                         detail: PremiumFeature.upgradeIsOffered()
-                            ? "Pay once, no renewals. Includes every feature available when you buy; features added later may be offered as a one-time upgrade, or are included with a subscription."
-                            : "Pay once, no renewals.",
+                            ? "For one person, not for teams. No renewals. Includes 5 years of recording, website sync and updates. Features added later may be offered as a one-time upgrade, or are included with a subscription."
+                            : "For one person, not for teams. No renewals. Includes 5 years of recording, website sync and updates.",
                         buyLabel: "Buy"
                     )
                 } header: {
                     Text("Choose a plan")
                 } footer: {
-                    Text("The first two months are free. Subscriptions are charged to your Apple ID at confirmation of purchase and renew each month or year until cancelled at least 24 hours before the end of the current period. Manage or cancel in your Apple ID account settings. The lifetime purchase is charged once and restored with Restore Purchases. Switching between subscriptions is handled by the App Store.")
+                    Text("The first two months are free. Subscriptions are charged to your Apple ID at confirmation of purchase and renew each month or year until cancelled at least 24 hours before the end of the current period. Manage or cancel in your Apple ID account settings. The pay-once purchase is charged once, lasts five years from the purchase date, and is restored with Restore Purchases. Switching between subscriptions is handled by the App Store.")
                 }
 
-                if case .lifetime = subscriptions.state, !subscriptions.lockedFeatures.isEmpty {
+                if case .purchased = subscriptions.state, !subscriptions.lockedFeatures.isEmpty {
                     Section("Upgrade") {
                         Text("New since you bought: \(subscriptions.lockedFeatures.map(\.name).formatted()).")
-                        if let upgrade = subscriptions.product(ProductID.lifetimeUpgrade) {
+                        if let upgrade = subscriptions.product(ProductID.fiveYearUpgrade) {
                             Button("Upgrade for \(upgrade.displayPrice)") { Task { await subscriptions.purchase(upgrade) } }
                                 .buttonStyle(.borderedProminent)
                                 .disabled(subscriptions.isWorking)
@@ -101,10 +101,10 @@ extension SubscriptionView {
             "Free trial, ends \(end.formatted(date: .abbreviated, time: .omitted))."
         case .subscribed(let plan):
             "Subscribed\(plan.map { " to \($0.displayName)" } ?? "")."
-        case .lifetime(let through):
-            "Lifetime plan. Includes every feature released through \(through.formatted(date: .abbreviated, time: .omitted))."
+        case .purchased(_, let end):
+            "Pay-once plan, active until \(end.formatted(date: .abbreviated, time: .omitted))."
         case .expired:
-            "Your two free months have ended."
+            "Your plan has ended."
         }
     }
 }
@@ -157,7 +157,7 @@ private struct PlanRow: View {
 
     private var isCurrent: Bool {
         guard let subscriptions else { return false }
-        if id == ProductID.lifetime, case .lifetime = subscriptions.state { return true }
+        if id == ProductID.fiveYear, case .purchased = subscriptions.state { return true }
         if case .subscribed = subscriptions.state { return subscriptions.currentProductID == id }
         return false
     }

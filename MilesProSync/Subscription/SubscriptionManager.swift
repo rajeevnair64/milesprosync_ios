@@ -2,7 +2,7 @@ import Foundation
 import Observation
 import StoreKit
 
-/// Apple in-app purchase for the subscriptions and the one-time lifetime purchase (StoreKit 2). Purchases are verified on the
+/// Apple in-app purchase for the subscriptions and the five-year pay-once purchase (StoreKit 2). Purchases are verified on the
 /// device by StoreKit; the Team transaction is also sent to the website, which verifies Apple's
 /// signature again before unlocking team features.
 @Observable
@@ -38,10 +38,10 @@ final class SubscriptionManager {
     /// The product in force now, so the plans screen can mark it and offer the others.
     var currentProductID: String? { defaults.string(forKey: AccessStore.productKey) }
 
-    /// Premium features a lifetime owner doesn't have yet (empty for everyone else), so the plans
+    /// Premium features a pay-once owner doesn't have yet (empty for everyone else), so the plans
     /// screen can offer the upgrade.
     var lockedFeatures: [PremiumFeature] {
-        guard PremiumFeature.upgradeIsOffered(), case .lifetime = state else { return [] }
+        guard PremiumFeature.upgradeIsOffered(), case .purchased = state else { return [] }
         return PremiumFeature.all.filter { !state.includes($0) }
     }
 
@@ -95,15 +95,16 @@ final class SubscriptionManager {
     /// Re-reads what the App Store says is in force and updates the cached state.
     func refresh() async {
         var best: (transaction: Transaction, jws: String)?
-        var lifetimeAt: Date?
+        var purchasedAt: Date?
         var upgradedAt: Date?
         for await result in Transaction.currentEntitlements {
             guard case .verified(let transaction) = result, transaction.revocationDate == nil else { continue }
             switch transaction.productID {
-            case ProductID.lifetime:
-                // originalPurchaseDate is the same on every device and after a restore.
-                lifetimeAt = transaction.originalPurchaseDate
-            case ProductID.lifetimeUpgrade:
+            case ProductID.fiveYear:
+                // originalPurchaseDate is the same on every device and after a restore. The
+                // five years are counted from it by AccessPolicy.
+                purchasedAt = transaction.originalPurchaseDate
+            case ProductID.fiveYearUpgrade:
                 upgradedAt = transaction.originalPurchaseDate
             case let id where ProductID.all.contains(id):
                 guard let expires = transaction.expirationDate, expires > .now else { continue }
@@ -119,8 +120,9 @@ final class SubscriptionManager {
             until: best?.transaction.expirationDate, plan: plan, productID: best?.transaction.productID,
             defaults: defaults
         )
-        AccessStore.saveLifetime(
-            through: AccessPolicy.lifetimeCoverage(purchasedAt: lifetimeAt, upgradedAt: upgradedAt),
+        AccessStore.savePurchase(
+            at: purchasedAt,
+            featuresThrough: AccessPolicy.featureCoverage(purchasedAt: purchasedAt, upgradedAt: upgradedAt),
             defaults: defaults
         )
         teamTransaction = plan == .team ? best?.jws : nil

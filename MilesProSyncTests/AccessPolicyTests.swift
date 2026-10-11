@@ -56,31 +56,41 @@ struct AccessPolicyTests {
         #expect(Plan(productID: "other") == nil)
     }
 
-    // MARK: Lifetime (one-time) purchase
+    // MARK: Pay-once (five-year) purchase
 
-    @Test func aLifetimePurchaseNeverExpires() {
+    @Test func aPurchaseLastsFiveYears() {
         let bought = date(2026, 6, 1)
-        let state = AccessPolicy.state(
-            trialStart: date(2026, 1, 15), subscribedUntil: nil, plan: nil, lifetimeThrough: bought,
-            now: date(2030, 1, 1), calendar: calendar
+        #expect(AccessPolicy.purchaseEnd(from: bought, calendar: calendar) == date(2031, 6, 1))
+        let during = AccessPolicy.state(
+            trialStart: date(2026, 1, 15), subscribedUntil: nil, plan: nil, purchasedAt: bought,
+            now: date(2031, 5, 31), calendar: calendar
         )
-        #expect(state == .lifetime(coversThrough: bought))
-        #expect(state.allowsRecording)
+        #expect(during == .purchased(featuresThrough: bought, endsAt: date(2031, 6, 1)))
+        #expect(during.allowsRecording)
     }
 
-    @Test func aSubscriptionTakesPrecedenceOverLifetime() {
+    @Test func recordingStopsWhenTheFiveYearsEnd() {
+        let state = AccessPolicy.state(
+            trialStart: date(2026, 1, 15), subscribedUntil: nil, plan: nil, purchasedAt: date(2026, 6, 1),
+            now: date(2031, 6, 1), calendar: calendar
+        )
+        #expect(state == .expired)
+        #expect(!state.allowsRecording)
+    }
+
+    @Test func aSubscriptionTakesPrecedenceOverAPurchase() {
         let state = AccessPolicy.state(
             trialStart: date(2026, 1, 15), subscribedUntil: date(2026, 9, 1), plan: .individual,
-            lifetimeThrough: date(2026, 6, 1), now: date(2026, 7, 1), calendar: calendar
+            purchasedAt: date(2026, 6, 1), now: date(2026, 7, 1), calendar: calendar
         )
         #expect(state == .subscribed(.individual))
     }
 
-    @Test func lifetimeCoversFeaturesReleasedUpToThePurchase() {
+    @Test func aPurchaseCoversFeaturesReleasedUpToIt() {
         let old = PremiumFeature(id: "old", name: "Old", releasedAt: date(2026, 3, 1))
         let same = PremiumFeature(id: "same", name: "Same", releasedAt: date(2026, 6, 1))
         let later = PremiumFeature(id: "later", name: "Later", releasedAt: date(2026, 9, 1))
-        let state = AccessState.lifetime(coversThrough: date(2026, 6, 1))
+        let state = AccessState.purchased(featuresThrough: date(2026, 6, 1), endsAt: date(2031, 6, 1))
         #expect(state.includes(old))
         #expect(state.includes(same))
         #expect(!state.includes(later))
@@ -93,16 +103,18 @@ struct AccessPolicyTests {
         #expect(!AccessState.expired.includes(later))
     }
 
-    @Test func anUpgradeExtendsCoverageToItsDate() {
+    @Test func anUpgradeAddsFeaturesButNotTime() {
         let bought = date(2026, 6, 1)
         let upgraded = date(2027, 2, 1)
-        #expect(AccessPolicy.lifetimeCoverage(purchasedAt: bought, upgradedAt: nil) == bought)
-        #expect(AccessPolicy.lifetimeCoverage(purchasedAt: bought, upgradedAt: upgraded) == upgraded)
+        #expect(AccessPolicy.featureCoverage(purchasedAt: bought, upgradedAt: nil) == bought)
+        #expect(AccessPolicy.featureCoverage(purchasedAt: bought, upgradedAt: upgraded) == upgraded)
         let feature = PremiumFeature(id: "f", name: "F", releasedAt: date(2026, 12, 1))
-        let before = AccessState.lifetime(coversThrough: bought)
-        let after = AccessState.lifetime(coversThrough: upgraded)
-        #expect(!before.includes(feature))
-        #expect(after.includes(feature))
+        let state = AccessPolicy.state(
+            trialStart: date(2026, 1, 15), subscribedUntil: nil, plan: nil, purchasedAt: bought,
+            featuresThrough: upgraded, now: date(2027, 3, 1), calendar: calendar
+        )
+        #expect(state.includes(feature))
+        #expect(state == .purchased(featuresThrough: upgraded, endsAt: date(2031, 6, 1)))
     }
 
     @Test func upgradesStayHiddenUntilACoupleOfFeaturesExist() {
@@ -115,20 +127,20 @@ struct AccessPolicyTests {
     }
 
     @Test func anUpgradeAloneUnlocksNothing() {
-        #expect(AccessPolicy.lifetimeCoverage(purchasedAt: nil, upgradedAt: date(2027, 2, 1)) == nil)
+        #expect(AccessPolicy.featureCoverage(purchasedAt: nil, upgradedAt: date(2027, 2, 1)) == nil)
     }
 
     @Test func oneTimeProductsAreNotSubscriptionsOrTeamPlans() {
-        #expect(Plan(productID: ProductID.lifetime) == nil)
-        #expect(Plan(productID: ProductID.lifetimeUpgrade) == nil)
-        #expect(!ProductID.all.contains(ProductID.lifetime))
-        #expect(!ProductID.teamPlans.contains(ProductID.lifetime))
-        #expect(ProductID.oneTime == [ProductID.lifetime, ProductID.lifetimeUpgrade])
+        #expect(Plan(productID: ProductID.fiveYear) == nil)
+        #expect(Plan(productID: ProductID.fiveYearUpgrade) == nil)
+        #expect(!ProductID.all.contains(ProductID.fiveYear))
+        #expect(!ProductID.teamPlans.contains(ProductID.fiveYear))
+        #expect(ProductID.oneTime == [ProductID.fiveYear, ProductID.fiveYearUpgrade])
         #expect(Set(ProductID.store).count == 6)
     }
 
-    @Test func theCachedLifetimePurchaseDrivesAccessState() {
-        let suite = "access-lifetime-\(UUID().uuidString)"
+    @Test func theCachedPurchaseDrivesAccessState() {
+        let suite = "access-purchase-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!
         defer { defaults.removePersistentDomain(forName: suite) }
         let item = KeychainItem(service: "com.aisleweb.MilesProSync.tests.\(suite)", account: "start")
@@ -138,10 +150,16 @@ struct AccessPolicyTests {
         _ = item.write(Data(String(date(2026, 1, 1).timeIntervalSince1970).utf8))
         #expect(AccessStore.state(now: now, defaults: defaults, item: item) == .expired)
 
-        AccessStore.saveLifetime(through: date(2026, 6, 1), defaults: defaults)
-        #expect(AccessStore.state(now: now, defaults: defaults, item: item) == .lifetime(coversThrough: date(2026, 6, 1)))
+        AccessStore.savePurchase(at: date(2026, 6, 1), featuresThrough: date(2026, 6, 1), defaults: defaults)
+        let state = AccessStore.state(now: now, defaults: defaults, item: item)
+        #expect(state.allowsRecording)
+        if case .purchased(_, let end) = state {
+            #expect(end == AccessPolicy.purchaseEnd(from: date(2026, 6, 1)))
+        } else {
+            Issue.record("Expected a purchased state, got \(state)")
+        }
 
-        AccessStore.saveLifetime(through: nil, defaults: defaults)
+        AccessStore.savePurchase(at: nil, featuresThrough: nil, defaults: defaults)
         #expect(AccessStore.state(now: now, defaults: defaults, item: item) == .expired)
     }
 

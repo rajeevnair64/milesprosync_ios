@@ -13,21 +13,22 @@ enum ProductID {
     static let all = [individual, individualAnnual, team, teamAnnual]
     static let teamPlans = [team, teamAnnual]
 
-    /// One-time purchases (non-consumable, outside the subscription group), individual use only.
-    /// Pay once: $109.99, no renewals. Covers every feature released up to the purchase date.
-    static let lifetime = "com.aisleweb.MilesProSync.individual.lifetime"
-    /// A later one-time upgrade for a lifetime owner that adds the premium features released
-    /// since they bought. Its price is set in App Store Connect.
-    static let lifetimeUpgrade = "com.aisleweb.MilesProSync.individual.lifetime.upgrade"
-    static let oneTime = [lifetime, lifetimeUpgrade]
+    /// Pay once, individual use only: $109.99 for five years (`AccessPolicy.purchaseYears`), no
+    /// renewals. Create it in App Store Connect as a non-renewing subscription (the app counts
+    /// the five years from the purchase date). Covers every feature released up to that date.
+    static let fiveYear = "com.aisleweb.MilesProSync.individual.fiveyear"
+    /// A later one-time upgrade (non-consumable) that adds the premium features released since
+    /// the purchase. Its price is set in App Store Connect.
+    static let fiveYearUpgrade = "com.aisleweb.MilesProSync.individual.fiveyear.upgrade"
+    static let oneTime = [fiveYear, fiveYearUpgrade]
     /// Everything the plans screen asks the App Store about.
     static let store = all + oneTime
 }
 
-/// A feature that is part of the paid product but not of an older lifetime purchase. A lifetime
+/// A feature that is part of the paid product but not of an older pay-once purchase. A pay-once
 /// owner has the features released on or before their purchase (or upgrade) date; anything
 /// released later is unlocked by the upgrade or by subscribing. Subscribers and people in the
-/// free period have every feature. Add an entry here when shipping a feature that lifetime
+/// free period have every feature. Add an entry here when shipping a feature that pay-once
 /// owners should upgrade for; features not listed are available to everyone.
 struct PremiumFeature: Identifiable, Equatable, Sendable {
     let id: String
@@ -68,9 +69,10 @@ enum AccessState: Equatable, Sendable {
     /// The free period for a new user: every feature, two months from first launch.
     case trial(endsAt: Date)
     case subscribed(Plan?)
-    /// Bought once: recording never expires, and every feature released on or before
-    /// `coversThrough` is included (see `PremiumFeature`).
-    case lifetime(coversThrough: Date)
+    /// Bought once: everything for five years from the purchase (`endsAt`), including every
+    /// feature released on or before `featuresThrough` (see `PremiumFeature`). After `endsAt`
+    /// the state is `.expired`, like a lapsed subscription.
+    case purchased(featuresThrough: Date, endsAt: Date)
     /// Free period over and no subscription: existing trips stay viewable and exportable, but no
     /// new drives are recorded.
     case expired
@@ -84,7 +86,7 @@ enum AccessState: Equatable, Sendable {
     func includes(_ feature: PremiumFeature) -> Bool {
         switch self {
         case .trial, .subscribed: true
-        case .lifetime(let coversThrough): feature.releasedAt <= coversThrough
+        case .purchased(let featuresThrough, _): feature.releasedAt <= featuresThrough
         case .expired: false
         }
     }
@@ -99,21 +101,33 @@ enum AccessPolicy {
         calendar.date(byAdding: .month, value: trialMonths, to: start) ?? start.addingTimeInterval(61 * 86_400)
     }
 
-    /// The date a lifetime owner's features run through: the purchase, or the later upgrade.
-    /// Nil without a lifetime purchase (an upgrade alone unlocks nothing).
-    static func lifetimeCoverage(purchasedAt: Date?, upgradedAt: Date?) -> Date? {
+    /// How long a pay-once purchase lasts.
+    static let purchaseYears = 5
+
+    static func purchaseEnd(from purchasedAt: Date, calendar: Calendar = .current) -> Date {
+        calendar.date(byAdding: .year, value: purchaseYears, to: purchasedAt)
+            ?? purchasedAt.addingTimeInterval(Double(purchaseYears) * 365 * 86_400)
+    }
+
+    /// The date a pay-once owner's features run through: the purchase, or the later upgrade.
+    /// Nil without a purchase (an upgrade alone unlocks nothing). The upgrade adds features, not time.
+    static func featureCoverage(purchasedAt: Date?, upgradedAt: Date?) -> Date? {
         guard let purchasedAt else { return nil }
         return max(purchasedAt, upgradedAt ?? purchasedAt)
     }
 
-    /// An active subscription has everything; a lifetime purchase never expires; otherwise the
-    /// free period, then expired.
+    /// An active subscription has everything; a pay-once purchase has everything for five years;
+    /// otherwise the free period, then expired.
     static func state(
-        trialStart: Date, subscribedUntil: Date?, plan: Plan?, lifetimeThrough: Date? = nil,
+        trialStart: Date, subscribedUntil: Date?, plan: Plan?,
+        purchasedAt: Date? = nil, featuresThrough: Date? = nil,
         now: Date = .now, calendar: Calendar = .current
     ) -> AccessState {
         if let subscribedUntil, subscribedUntil > now { return .subscribed(plan) }
-        if let lifetimeThrough { return .lifetime(coversThrough: lifetimeThrough) }
+        if let purchasedAt {
+            let end = purchaseEnd(from: purchasedAt, calendar: calendar)
+            if now < end { return .purchased(featuresThrough: featuresThrough ?? purchasedAt, endsAt: end) }
+        }
         let end = trialEnd(from: trialStart, calendar: calendar)
         return now < end ? .trial(endsAt: end) : .expired
     }
@@ -126,7 +140,8 @@ enum AccessStore {
     static let subscribedUntilKey = "access.subscribedUntil"
     static let planKey = "access.plan"
     static let productKey = "access.product"
-    static let lifetimeThroughKey = "access.lifetimeThrough"
+    static let purchasedAtKey = "access.purchasedAt"
+    static let featuresThroughKey = "access.featuresThrough"
 
     /// The first-launch date, recorded now if this is the first time anyone asked.
     static func trialStart(now: Date = .now, item: KeychainItem = trialItem) -> Date {
@@ -141,10 +156,11 @@ enum AccessStore {
     static func state(now: Date = .now, defaults: UserDefaults = .standard, item: KeychainItem = trialItem) -> AccessState {
         let until = defaults.object(forKey: subscribedUntilKey) as? Date
         let plan = defaults.string(forKey: planKey).flatMap(Plan.init(rawValue:))
-        let lifetime = defaults.object(forKey: lifetimeThroughKey) as? Date
+        let purchasedAt = defaults.object(forKey: purchasedAtKey) as? Date
+        let featuresThrough = defaults.object(forKey: featuresThroughKey) as? Date
         return AccessPolicy.state(
             trialStart: trialStart(now: now, item: item), subscribedUntil: until, plan: plan,
-            lifetimeThrough: lifetime, now: now
+            purchasedAt: purchasedAt, featuresThrough: featuresThrough, now: now
         )
     }
 
@@ -160,8 +176,9 @@ enum AccessStore {
         defaults.set(productID, forKey: productKey)
     }
 
-    /// The cached one-time purchase (nil when there isn't one).
-    static func saveLifetime(through: Date?, defaults: UserDefaults = .standard) {
-        defaults.set(through, forKey: lifetimeThroughKey)
+    /// The cached pay-once purchase (nil when there isn't one).
+    static func savePurchase(at purchasedAt: Date?, featuresThrough: Date?, defaults: UserDefaults = .standard) {
+        defaults.set(purchasedAt, forKey: purchasedAtKey)
+        defaults.set(featuresThrough, forKey: featuresThroughKey)
     }
 }
