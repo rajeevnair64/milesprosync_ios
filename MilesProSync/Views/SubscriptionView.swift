@@ -35,6 +35,8 @@ struct SubscriptionView: View {
                     Text("Payment is charged to your Apple ID account at confirmation of purchase. Subscriptions renew each month or year until cancelled at least 24 hours before the end of the current period. Manage or cancel in your Apple ID account settings. Switching between plans is handled by the App Store.")
                 }
 
+                lifetimeSection(subscriptions)
+
                 if let message = subscriptions.errorMessage {
                     Section { Text(message).foregroundStyle(.red) }
                 }
@@ -52,6 +54,44 @@ struct SubscriptionView: View {
         .navigationTitle("Subscription")
         .navigationBarTitleDisplayMode(.inline)
         .task { await subscriptions?.loadProducts() }
+    }
+
+    @ViewBuilder
+    private func lifetimeSection(_ subscriptions: SubscriptionManager) -> some View {
+        let owned = { if case .lifetime = subscriptions.state { return true } else { return false } }()
+        Section {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Lifetime").font(.headline)
+                Text("Pay once, no renewals. For one person, with website access. Includes every feature available when you buy; features added later may be offered as a one-time upgrade, or are included with a subscription.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                HStack {
+                    Text("\(subscriptions.product(ProductID.lifetime)?.displayPrice ?? "$79.99") once")
+                    Spacer()
+                    if owned {
+                        Label("Purchased", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
+                    } else if let product = subscriptions.product(ProductID.lifetime) {
+                        Button("Buy") { Task { await subscriptions.purchase(product) } }
+                            .buttonStyle(.borderedProminent)
+                            .disabled(subscriptions.isWorking)
+                    }
+                }
+                if owned, !subscriptions.lockedFeatures.isEmpty {
+                    Text("New since you bought: \(subscriptions.lockedFeatures.map(\.name).formatted()).")
+                        .font(.footnote)
+                    if let upgrade = subscriptions.product(ProductID.lifetimeUpgrade) {
+                        Button("Upgrade for \(upgrade.displayPrice)") { Task { await subscriptions.purchase(upgrade) } }
+                            .buttonStyle(.borderedProminent)
+                            .disabled(subscriptions.isWorking)
+                    }
+                }
+            }
+            .padding(.vertical, 4)
+        } header: {
+            Text("One-time purchase")
+        } footer: {
+            Text("A one-time purchase is charged once to your Apple ID. Restore Purchases brings it back on a new device.")
+        }
     }
 
     @ViewBuilder
@@ -111,6 +151,8 @@ struct SubscriptionView: View {
             "Free trial, ends \(end.formatted(date: .abbreviated, time: .omitted))."
         case .subscribed(let plan):
             "Subscribed\(plan.map { " to \($0.displayName)" } ?? "")."
+        case .lifetime(let through):
+            "Lifetime plan. Includes every feature released through \(through.formatted(date: .abbreviated, time: .omitted))."
         case .expired:
             "Your two free months have ended."
         }

@@ -2,7 +2,7 @@ import Foundation
 import Observation
 import StoreKit
 
-/// Apple in-app purchase for the two subscriptions (StoreKit 2). Purchases are verified on the
+/// Apple in-app purchase for the subscriptions and the one-time lifetime purchase (StoreKit 2). Purchases are verified on the
 /// device by StoreKit; the Team transaction is also sent to the website, which verifies Apple's
 /// signature again before unlocking team features.
 @Observable
@@ -38,10 +38,17 @@ final class SubscriptionManager {
     /// The product in force now, so the plans screen can mark it and offer the others.
     var currentProductID: String? { defaults.string(forKey: AccessStore.productKey) }
 
+    /// Premium features a lifetime owner doesn't have yet (empty for everyone else), so the plans
+    /// screen can offer the upgrade.
+    var lockedFeatures: [PremiumFeature] {
+        guard case .lifetime = state else { return [] }
+        return PremiumFeature.all.filter { !state.includes($0) }
+    }
+
     func loadProducts() async {
         guard products.isEmpty else { return }
         do {
-            products = try await Product.products(for: ProductID.all)
+            products = try await Product.products(for: ProductID.store)
                 .sorted { $0.price > $1.price }
         } catch {
             errorMessage = "Couldn't load subscription options. Check your connection and try again."
@@ -83,18 +90,32 @@ final class SubscriptionManager {
     /// Re-reads what the App Store says is in force and updates the cached state.
     func refresh() async {
         var best: (transaction: Transaction, jws: String)?
+        var lifetimeAt: Date?
+        var upgradedAt: Date?
         for await result in Transaction.currentEntitlements {
-            guard case .verified(let transaction) = result,
-                  ProductID.all.contains(transaction.productID),
-                  transaction.revocationDate == nil,
-                  let expires = transaction.expirationDate, expires > .now else { continue }
-            if best == nil || expires > (best?.transaction.expirationDate ?? .distantPast) {
-                best = (transaction, result.jwsRepresentation)
+            guard case .verified(let transaction) = result, transaction.revocationDate == nil else { continue }
+            switch transaction.productID {
+            case ProductID.lifetime:
+                // originalPurchaseDate is the same on every device and after a restore.
+                lifetimeAt = transaction.originalPurchaseDate
+            case ProductID.lifetimeUpgrade:
+                upgradedAt = transaction.originalPurchaseDate
+            case let id where ProductID.all.contains(id):
+                guard let expires = transaction.expirationDate, expires > .now else { continue }
+                if best == nil || expires > (best?.transaction.expirationDate ?? .distantPast) {
+                    best = (transaction, result.jwsRepresentation)
+                }
+            default:
+                continue
             }
         }
         let plan = best.flatMap { Plan(productID: $0.transaction.productID) }
         AccessStore.saveSubscription(
             until: best?.transaction.expirationDate, plan: plan, productID: best?.transaction.productID,
+            defaults: defaults
+        )
+        AccessStore.saveLifetime(
+            through: AccessPolicy.lifetimeCoverage(purchasedAt: lifetimeAt, upgradedAt: upgradedAt),
             defaults: defaults
         )
         teamTransaction = plan == .team ? best?.jws : nil
