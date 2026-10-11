@@ -48,7 +48,11 @@ struct AccessPolicyTests {
 
     @Test func productsMapToPlans() {
         #expect(Plan(productID: ProductID.individual) == .individual)
+        #expect(Plan(productID: ProductID.individualAnnual) == .individual)
         #expect(Plan(productID: ProductID.team) == .team)
+        #expect(Plan(productID: ProductID.teamAnnual) == .team)
+        #expect(Set(ProductID.all).count == 4)
+        #expect(ProductID.teamPlans == [ProductID.team, ProductID.teamAnnual])
         #expect(Plan(productID: "other") == nil)
     }
 

@@ -33,8 +33,10 @@ final class SubscriptionManager {
         updatesTask?.cancel()
     }
 
-    var individualProduct: Product? { products.first { $0.id == ProductID.individual } }
-    var teamProduct: Product? { products.first { $0.id == ProductID.team } }
+    func product(_ id: String) -> Product? { products.first { $0.id == id } }
+
+    /// The product in force now, so the plans screen can mark it and offer the others.
+    var currentProductID: String? { defaults.string(forKey: AccessStore.productKey) }
 
     func loadProducts() async {
         guard products.isEmpty else { return }
@@ -91,7 +93,10 @@ final class SubscriptionManager {
             }
         }
         let plan = best.flatMap { Plan(productID: $0.transaction.productID) }
-        AccessStore.saveSubscription(until: best?.transaction.expirationDate, plan: plan, defaults: defaults)
+        AccessStore.saveSubscription(
+            until: best?.transaction.expirationDate, plan: plan, productID: best?.transaction.productID,
+            defaults: defaults
+        )
         teamTransaction = plan == .team ? best?.jws : nil
         state = AccessStore.state(defaults: defaults)
     }

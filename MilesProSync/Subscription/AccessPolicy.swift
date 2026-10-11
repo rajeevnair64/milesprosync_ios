@@ -1,12 +1,17 @@
 import Foundation
 
-/// The two subscriptions, both in one App Store subscription group so a person has at most one.
+/// The subscriptions, all in one App Store subscription group so a person has at most one.
 enum ProductID {
     /// Single user, not on a team: $4.99/month after the two free months.
     static let individual = "com.aisleweb.MilesProSync.individual.monthly"
-    /// Per user on a team: $3.99/month, unlimited trips (the server checks this one).
+    /// The same plan billed yearly: $39.99/year.
+    static let individualAnnual = "com.aisleweb.MilesProSync.individual.annual"
+    /// Per user on a team: $3.99/month, unlimited trips (the server checks the team products).
     static let team = "com.aisleweb.MilesProSync.team.monthly"
-    static let all = [individual, team]
+    /// The team plan billed yearly: $39.99/user/year.
+    static let teamAnnual = "com.aisleweb.MilesProSync.team.annual"
+    static let all = [individual, individualAnnual, team, teamAnnual]
+    static let teamPlans = [team, teamAnnual]
 }
 
 enum Plan: String, Equatable, Sendable {
@@ -15,8 +20,8 @@ enum Plan: String, Equatable, Sendable {
 
     init?(productID: String) {
         switch productID {
-        case ProductID.individual: self = .individual
-        case ProductID.team: self = .team
+        case ProductID.individual, ProductID.individualAnnual: self = .individual
+        case ProductID.team, ProductID.teamAnnual: self = .team
         default: return nil
         }
     }
@@ -67,6 +72,7 @@ enum AccessStore {
     static let trialItem = KeychainItem(service: "com.aisleweb.MilesProSync.trial", account: "start")
     static let subscribedUntilKey = "access.subscribedUntil"
     static let planKey = "access.plan"
+    static let productKey = "access.product"
 
     /// The first-launch date, recorded now if this is the first time anyone asked.
     static func trialStart(now: Date = .now, item: KeychainItem = trialItem) -> Date {
@@ -90,8 +96,11 @@ enum AccessStore {
         state(now: now, defaults: defaults).allowsRecording
     }
 
-    static func saveSubscription(until: Date?, plan: Plan?, defaults: UserDefaults = .standard) {
+    static func saveSubscription(
+        until: Date?, plan: Plan?, productID: String? = nil, defaults: UserDefaults = .standard
+    ) {
         defaults.set(until, forKey: subscribedUntilKey)
         defaults.set(plan?.rawValue, forKey: planKey)
+        defaults.set(productID, forKey: productKey)
     }
 }

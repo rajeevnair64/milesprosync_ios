@@ -48,7 +48,7 @@ struct TeamView: View {
 
         if status?.subscription.active != true {
             Section {
-                Text("Team plans are $3.99 per user per month, with unlimited trips.")
+                Text("Team plans are $3.99 per user per month or $39.99 per user per year, with unlimited trips.")
                 NavigationLink("Choose a Plan") { SubscriptionView() }
             } header: {
                 Text("Subscription")

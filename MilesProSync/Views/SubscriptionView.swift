@@ -20,19 +20,19 @@ struct SubscriptionView: View {
 
                 Section {
                     plan(
-                        subscriptions.individualProduct, subscriptions: subscriptions,
-                        title: "Individual", blurb: "For one person. The first two months are free.",
-                        fallbackPrice: "$4.99"
+                        subscriptions, title: "Individual",
+                        blurb: "For one person. The first two months are free.",
+                        monthly: (ProductID.individual, "$4.99"), annual: (ProductID.individualAnnual, "$39.99")
                     )
                     plan(
-                        subscriptions.teamProduct, subscriptions: subscriptions,
-                        title: "Team", blurb: "Per user, for people on a team. Unlimited trips, team reports and approvals.",
-                        fallbackPrice: "$3.99"
+                        subscriptions, title: "Team",
+                        blurb: "Per user, for people on a team. Unlimited trips, team reports and approvals.",
+                        monthly: (ProductID.team, "$3.99"), annual: (ProductID.teamAnnual, "$39.99")
                     )
                 } header: {
                     Text("Plans")
                 } footer: {
-                    Text("Payment is charged to your Apple ID account at confirmation of purchase. Subscriptions renew monthly until cancelled at least 24 hours before the end of the current period. Manage or cancel in your Apple ID account settings. Switching between plans is handled by the App Store.")
+                    Text("Payment is charged to your Apple ID account at confirmation of purchase. Subscriptions renew each month or year until cancelled at least 24 hours before the end of the current period. Manage or cancel in your Apple ID account settings. Switching between plans is handled by the App Store.")
                 }
 
                 if let message = subscriptions.errorMessage {
@@ -56,28 +56,53 @@ struct SubscriptionView: View {
 
     @ViewBuilder
     private func plan(
-        _ product: Product?, subscriptions: SubscriptionManager, title: String, blurb: String, fallbackPrice: String
+        _ subscriptions: SubscriptionManager, title: String, blurb: String,
+        monthly: (id: String, fallbackPrice: String), annual: (id: String, fallbackPrice: String)
     ) -> some View {
-        let isCurrent: Bool = {
-            guard case .subscribed(let plan) = subscriptions.state else { return false }
-            return plan?.displayName == title
-        }()
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text(title).font(.headline)
-                Spacer()
-                Text("\(product?.displayPrice ?? fallbackPrice)/month").foregroundStyle(.secondary)
-            }
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title).font(.headline)
             Text(blurb).font(.footnote).foregroundStyle(.secondary)
-            if isCurrent {
-                Label("Current plan", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
+            option(subscriptions, id: monthly.id, label: "Monthly", fallbackPrice: monthly.fallbackPrice, per: "month")
+            option(
+                subscriptions, id: annual.id, label: "Yearly", fallbackPrice: annual.fallbackPrice, per: "year",
+                savings: savings(subscriptions, monthly: monthly.id, annual: annual.id)
+            )
+        }
+        .padding(.vertical, 4)
+    }
+
+    @ViewBuilder
+    private func option(
+        _ subscriptions: SubscriptionManager, id: String, label: String, fallbackPrice: String, per: String,
+        savings: String? = nil
+    ) -> some View {
+        let product = subscriptions.product(id)
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("\(label): \(product?.displayPrice ?? fallbackPrice)/\(per)")
+                if let savings {
+                    Text(savings).font(.caption).foregroundStyle(.green)
+                }
+            }
+            Spacer()
+            if subscriptions.currentProductID == id, case .subscribed = subscriptions.state {
+                Label("Current", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
             } else if let product {
                 Button("Subscribe") { Task { await subscriptions.purchase(product) } }
                     .buttonStyle(.borderedProminent)
                     .disabled(subscriptions.isWorking)
             }
         }
-        .padding(.vertical, 4)
+    }
+
+    /// "Save 33%" when both prices are loaded from the App Store.
+    private func savings(_ subscriptions: SubscriptionManager, monthly: String, annual: String) -> String? {
+        guard let month = subscriptions.product(monthly)?.price, let year = subscriptions.product(annual)?.price,
+              month > 0 else { return nil }
+        let full = month * 12
+        guard year < full else { return nil }
+        let percent = NSDecimalNumber(decimal: (full - year) / full * 100).intValue
+        return percent > 0 ? "Save \(percent)% compared with monthly" : nil
     }
 
     private func statusText(_ state: AccessState) -> String {
