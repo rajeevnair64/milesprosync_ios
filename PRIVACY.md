@@ -6,8 +6,8 @@ This policy explains what information MilesProSync (the "app") collects, how it 
 
 ## Summary
 
-- The app records your location while you drive so it can log trips and calculate mileage automatically.
-- You do not need an account to use the app. Your trips and settings are stored on your device.
+- The app records your location while you drive so it can log trips and calculate mileage automatically. Addresses you type (to add a trip or save a place) are looked up by Apple to find their location.
+- You do not need an account to use the app. Your trips, saved places, trip purposes and settings are stored on your device.
 - Website Sync is optional. Only if you turn it on by signing in with Apple are your trips (including their GPS routes) uploaded to our cloud database, so you can view them on the MilesProSync website.
 - When you delete a trip, it is hidden from you but kept as a record on your device and in our cloud database.
 - Subscriptions are bought through Apple's in-app purchase. New users get two free months; after that the app needs a subscription to record new drives.
@@ -36,8 +36,11 @@ For each drive, the app creates a trip record containing:
 - start and end coordinates, and the full GPS route described above
 - distance driven
 - start and end street addresses (see "Address lookup" below)
-- the classification you choose (Business, Personal, or Unclassified) and any notes
+- the classification you choose (Business, Personal, or Unclassified), or that the app set for you from your saved places and work hours, and any notes
+- an optional purpose you pick for the trip (for example "Client visit"), which stays on your device and is not uploaded
 - whether and when you deleted the trip
+
+You can also add a trip yourself, for a drive the app missed, and edit a trip's times, addresses, distance, classification, purpose and notes. A trip you add by hand has no GPS route; it has the addresses you typed, the coordinates Apple finds for them, and the distance you enter.
 
 Trip records are kept for four years from the date of the trip. See "Retention" below.
 
@@ -51,7 +54,13 @@ While Website Sync is on, the app stores your Apple ID identifier and a cloud si
 
 ### Settings
 
-Your country and reimbursement rate are stored only on your device and are not uploaded.
+These are stored only on your device and are not uploaded:
+
+- your country and how you are reimbursed: the IRS standard rate, a rate of your own, or FAVR figures (a fixed monthly amount, a per-mile rate and a minimum monthly mileage)
+- your auto-classification rules: saved places (a name, an address and its coordinates, and whether trips to or from it are Business or Personal) and your work days and hours
+- your list of trip purposes
+
+The app also asks our website for the IRS standard mileage rate by year, so a new year's rate reaches you without an app update. That request contains no information about you beyond what any web request carries, such as your IP address.
 
 ### Website
 
@@ -64,13 +73,15 @@ The website uses only these cookies, all needed for it to work. There are no adv
 - your time zone, so trip times show in your local time
 - your reimbursement rate and currency symbol, only if you change them on the website
 
+If you use a team on the website, its pages use the same sign-in and security cookies.
+
 Route drawings on the website are made in your browser from your own trip data; no map service receives your trip locations.
 
 ### Subscriptions
 
-Subscriptions are bought and managed through Apple (in-app purchase), and Apple handles your payment details; we never receive your card or payment information. The app keeps the date you first used it (in the iOS Keychain, so reinstalling doesn't restart the two free months) and the expiry date of your current subscription, on your device, to decide whether new drives can be recorded.
+Subscriptions are bought and managed through Apple (in-app purchase), and Apple handles your payment details; we never receive your card or payment information. The app keeps the date you first used it and the expiry date of your current subscription on your device, to decide whether new drives can be recorded. The first-use date is kept in the iOS Keychain, which survives removing the app, so reinstalling doesn't restart the two free months.
 
-If you subscribe to a Team plan, the app also sends Apple's signed receipt for that subscription to our server, together with your account, so the server can confirm the subscription is active. We store the product, the expiry date, and the original transaction identifier.
+If you subscribe to a Team plan, the app also sends Apple's signed receipt for that subscription to our server, together with your account, so the server can confirm the subscription is active. We store the product, the expiry date, and the original transaction identifier, until you delete your website account.
 
 ### Teams (optional)
 
@@ -81,7 +92,7 @@ You can join a team with an invite code from the team's admin. Joining needs Web
 - Each month you can submit a report. Managers can approve or reject it with a comment. An approved report keeps a fixed snapshot of the number of trips, miles, and amount, and a log of team actions (joins, role changes, rate changes and approvals) is kept for the team's records.
 - You can leave a team at any time in the app (Settings → Team → Leave Team), which ends the team's access to your trips immediately. Deleting your website account also removes you from the team.
 
-Team records (membership, reports and the activity log) are kept for four years from the date they were created, like trip records, and then erased.
+Team records (membership, reports, invites and the activity log) are kept for four years from the date they were made, or from the date you left the team, like trip records, and then erased.
 
 ## How we use information
 
@@ -104,7 +115,7 @@ When you delete a trip, it is removed from your trip list and from exports, and 
 
 We do not sell or rent your information, and we do not share it with third parties for their own purposes. The app relies on these service providers:
 
-- **Apple (address lookup).** When a trip ends, the app sends its start and end coordinates to Apple's geocoding service to look up street addresses. Apple's handling of this data is described in Apple's privacy policy.
+- **Apple (address lookup).** When a trip ends, the app sends its start and end coordinates to Apple's geocoding service to look up street addresses. When you add or edit a trip or save a place, the address you type is sent to Apple's geocoding service to find its coordinates. Apple's handling of this data is described in Apple's privacy policy.
 - **Apple (in-app purchase).** Apple processes your subscription payment and tells the app which subscription is active. Apple's handling of this is described in Apple's privacy policy.
 - **Apple (Sign in with Apple, only if you turn on Website Sync).** Apple authenticates you and tells us your Apple ID identifier and, if you share it, your email address. Apple's handling of this is described in Apple's privacy policy.
 - **jsDelivr (website only).** The website loads its Bootstrap code and style files from jsDelivr, a public content delivery network, which receives your IP address and browser information when delivering them.
@@ -114,7 +125,7 @@ We may also disclose information if required by law, or to protect the rights an
 
 ## Exports you share
 
-Exports (CSV, PDF, Excel) are created on your device and include trip dates, addresses, distances, classifications, and reimbursement amounts. When you share an export, for example by email or AirDrop, the recipient receives that information. We do not see or control exports you share.
+Exports (CSV, PDF, Excel) are created on your device and include trip dates, addresses, distances, classifications, trip purposes, and reimbursement amounts (including any FAVR fixed amount). When you share an export, for example by email or AirDrop, the recipient receives that information. We do not see or control exports you share.
 
 ## Storage and security
 
@@ -127,9 +138,10 @@ Exports (CSV, PDF, Excel) are created on your device and include trip dates, add
 
 We keep trip records for **four years from the date of each trip** for tax and audit record-keeping, and then permanently erase them.
 
-- **On your device**, trips you have deleted are erased once they are four years old. Trips still in your trip list stay until you delete them. Turning off Website Sync keeps your trips and settings on the device. Removing the app erases all of its data from the device, including your sign-in.
+- **On your device**, trips you have deleted are erased once they are four years old. Trips still in your trip list stay until you delete them. Turning off Website Sync keeps your trips and settings on the device. Removing the app erases its data from the device, including your sign-in, except the date you first used the app, which stays in the iOS Keychain so the free period isn't restarted (see "Subscriptions").
 - **In the cloud** (only if you used Website Sync), every trip record, including deleted trips, is erased four years after the date of the trip. This applies even if you delete your account: deleting your account removes your cloud login and email address, but trip records already uploaded are kept until they reach four years old.
-- **Account information** (your email address and login) is kept until you delete your website account.
+- **Account information** (your email address and login) and your subscription record are kept until you delete your website account.
+- **Team records** (membership, reports, invites and the activity log) are kept for four years from the date they were made, or from the date you left the team, and then erased.
 
 ## Your choices and rights
 
@@ -137,9 +149,11 @@ We keep trip records for **four years from the date of each trip** for tax and a
 - **Website Sync is optional:** leave it off and nothing is uploaded. If you turn it on, Settings → Website Sync → Turn Off Website Sync stops uploads at any time. Trips keep recording on your device.
 - **Stopping Sign in with Apple:** you can stop using Sign in with Apple for the app in iOS Settings → your name → Sign-In & Security → Sign in with Apple. The app then turns off Website Sync.
 - **Access and copies:** you can export your trips at any time from the app.
-- **Correction:** you can change a trip's classification in the app.
+- **Correction:** you can edit a trip's details in the app (times, addresses, distance, classification, purpose and notes), and add a trip the app missed.
+- **Your saved places, work hours, purposes and rates:** you can change or delete these at any time in Settings. They never leave your device.
+- **Subscriptions:** you can manage or cancel a subscription in your Apple ID account settings. Cancelling doesn't delete your trips.
 - **Leaving a team:** Settings → Team → Leave Team ends a team's access to your trips right away.
-- **Account deletion:** you can delete your website account in the app under Settings → Website Sync → Delete Website Account, or on the website's Account page. This removes your cloud login and email address immediately and turns off Website Sync; uploaded trip records are kept until four years after each trip's date, as described in "Retention", then erased. You can also contact us at admin@aisleweb.com.
+- **Account deletion:** you can delete your website account in the app under Settings → Website Sync → Delete Website Account, or on the website's Account page. This removes your cloud login and email address and your subscription record immediately, ends any team membership, and turns off Website Sync; uploaded trip records are kept until four years after each trip's date, as described in "Retention", then erased. You can also contact us at admin@aisleweb.com.
 - Depending on where you live (for example, the European Economic Area, the United Kingdom, or California), you may have additional rights, such as to access, correct, delete, or port your personal information, or to object to or restrict certain processing. To exercise them, contact us at admin@aisleweb.com. We will respond within the time required by applicable law.
 
 ## Children
