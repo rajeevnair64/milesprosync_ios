@@ -89,6 +89,7 @@ You can join a team with an invite code from the team's admin. Joining needs Web
 
 - The team's admins and managers can see, on the website, your **Business** trips that ended after you joined and before you left: dates, start and end addresses, distances and reimbursement amounts. They cannot see Personal or Unclassified trips, deleted trips, your notes, or anything before you joined or after you left. Your GPS routes are not shown to the team.
 - Your team's membership record keeps your role, the dates you joined and left, and your email address (or Apple's private relay address) so the team can identify you.
+- A team admin can set up a webhook so the team's own payroll or accounting system is told when a report is approved. It carries the month's totals for that report (the team, your email address or private relay address, the month, and the number of trips, miles and amounts), never addresses, routes, notes or individual trips.
 - Each month you can submit a report. Managers can approve or reject it with a comment. An approved report keeps a fixed snapshot of the number of trips, miles, and amount, and a log of team actions (joins, role changes, rate changes and approvals) is kept for the team's records.
 - You can leave a team at any time in the app (Settings → Team → Leave Team), which ends the team's access to your trips immediately. Deleting your website account also removes you from the team.
 
