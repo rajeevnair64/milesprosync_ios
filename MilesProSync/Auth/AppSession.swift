@@ -71,6 +71,10 @@ final class AppSession {
 
     var isCloudConfigured: Bool { apiConfig != nil }
 
+    /// The Miles Pro Sync website that synced trips can be viewed on; nil when this build has no
+    /// server configured.
+    var websiteURL: URL? { apiConfig?.baseURL }
+
     /// Opens the device's account synchronously, creating one on first launch, so a background
     /// relaunch (trip in progress, significant location change) resumes recording before launch
     /// finishes.

@@ -8,6 +8,7 @@ struct SettingsView: View {
     /// Edited as text and saved on every keystroke: a value-formatted TextField only commits on
     /// Return or focus loss, and the decimal keypad has no Return key.
     @State private var rateText = ""
+    @State private var showingWebsiteSetup = false
 
     private var isUS: Bool { countryCode == "US" }
 
@@ -50,7 +51,7 @@ struct SettingsView: View {
                             .foregroundStyle(.red)
                     }
                 }
-                WebsiteSyncSection()
+                WebsiteSyncSection(showingSetup: $showingWebsiteSetup)
                 Section("About") {
                     NavigationLink("Privacy Policy") {
                         PrivacyPolicyView()
@@ -60,6 +61,9 @@ struct SettingsView: View {
             }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
+            .sheet(isPresented: $showingWebsiteSetup) {
+                WebsiteSyncSetupView()
+            }
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }

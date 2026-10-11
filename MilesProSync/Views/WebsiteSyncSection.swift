@@ -8,7 +8,9 @@ struct WebsiteSyncSection: View {
     @Environment(AppSession.self) private var appSession
     @Environment(TripSyncService.self) private var sync
     @Environment(\.colorScheme) private var colorScheme
-    @State private var showingSetup = false
+    /// Owned by the presenting screen: a sheet attached inside this section's form rows is
+    /// dismissed again as soon as it appears.
+    @Binding var showingSetup: Bool
     @State private var confirmingTurnOff = false
     @State private var confirmingDeletion = false
     @State private var isDeleting = false
@@ -21,10 +23,13 @@ struct WebsiteSyncSection: View {
             if !sync.isConfigured {
                 Text("Website sync isn't available in this build. Your trips stay on this iPhone.")
                     .foregroundStyle(.secondary)
-            } else if isLinked {
-                linked
             } else {
-                notLinked
+                websiteLink
+                if isLinked {
+                    linked
+                } else {
+                    notLinked
+                }
             }
         } header: {
             Text("Website Sync (Optional)")
@@ -35,8 +40,18 @@ struct WebsiteSyncSection: View {
                     : "Only needed if you want to view your trips on the Miles Pro Sync website. Trips are recorded, kept and exported on this iPhone without it.")
             }
         }
-        .sheet(isPresented: $showingSetup) {
-            WebsiteSyncSetupView()
+    }
+
+    /// Where the uploaded trips are viewed, so people know the site this feature belongs to.
+    @ViewBuilder
+    private var websiteLink: some View {
+        if let url = appSession.websiteURL {
+            Link(destination: url) {
+                LabeledContent("Website") {
+                    Text(url.host() ?? url.absoluteString)
+                        .foregroundStyle(.tint)
+                }
+            }
         }
     }
 
@@ -143,7 +158,7 @@ struct WebsiteSyncSetupView: View {
         NavigationStack {
             List {
                 Section {
-                    Text("Sign in with Apple to create your Miles Pro Sync website account, so you can view your trips on the website. This is optional: without it, trips are recorded and kept only on this iPhone, and you can still export them.")
+                    Text("Sign in with Apple to create your Miles Pro Sync website account, so you can view your trips on \(appSession.websiteURL?.host() ?? "the website"). This is optional: without it, trips are recorded and kept only on this iPhone, and you can still export them.")
                 }
                 SharedDataSections()
                 Section {
