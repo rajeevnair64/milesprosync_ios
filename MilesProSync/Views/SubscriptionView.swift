@@ -19,23 +19,40 @@ struct SubscriptionView: View {
                 }
 
                 Section {
-                    plan(
-                        subscriptions, title: "Individual",
-                        blurb: "For one person. The first two months are free.",
-                        monthly: (ProductID.individual, "$4.99"), annual: (ProductID.individualAnnual, "$39.99")
+                    PlanRow(
+                        id: ProductID.individualAnnual, title: "Yearly", fallbackPrice: "$39.99", per: "/year",
+                        badge: "Best value",
+                        detail: perMonth(subscriptions, id: ProductID.individualAnnual, fallback: "$3.33")
+                            + " " + savings(subscriptions, monthly: ProductID.individual, annual: ProductID.individualAnnual)
                     )
-                    plan(
-                        subscriptions, title: "Team",
-                        blurb: "Per user, for people on a team. Unlimited trips, team reports and approvals.",
-                        monthly: (ProductID.team, "$3.99"), annual: (ProductID.teamAnnual, "$39.99")
+                    PlanRow(id: ProductID.individual, title: "Monthly", fallbackPrice: "$4.99", per: "/month")
+                    PlanRow(
+                        id: ProductID.lifetime, title: "Lifetime", fallbackPrice: "$109.99", per: " once",
+                        detail: PremiumFeature.upgradeIsOffered()
+                            ? "Pay once, no renewals. Includes every feature available when you buy; features added later may be offered as a one-time upgrade, or are included with a subscription."
+                            : "Pay once, no renewals.",
+                        buyLabel: "Buy"
                     )
                 } header: {
-                    Text("Plans")
+                    Text("Choose a plan")
                 } footer: {
-                    Text("Payment is charged to your Apple ID account at confirmation of purchase. Subscriptions renew each month or year until cancelled at least 24 hours before the end of the current period. Manage or cancel in your Apple ID account settings. Switching between plans is handled by the App Store.")
+                    Text("The first two months are free. Subscriptions are charged to your Apple ID at confirmation of purchase and renew each month or year until cancelled at least 24 hours before the end of the current period. Manage or cancel in your Apple ID account settings. The lifetime purchase is charged once and restored with Restore Purchases. Switching between subscriptions is handled by the App Store.")
                 }
 
-                lifetimeSection(subscriptions)
+                if case .lifetime = subscriptions.state, !subscriptions.lockedFeatures.isEmpty {
+                    Section("Upgrade") {
+                        Text("New since you bought: \(subscriptions.lockedFeatures.map(\.name).formatted()).")
+                        if let upgrade = subscriptions.product(ProductID.lifetimeUpgrade) {
+                            Button("Upgrade for \(upgrade.displayPrice)") { Task { await subscriptions.purchase(upgrade) } }
+                                .buttonStyle(.borderedProminent)
+                                .disabled(subscriptions.isWorking)
+                        }
+                    }
+                }
+
+                Section {
+                    NavigationLink("Using this for a team? See team plans") { TeamPlansView() }
+                }
 
                 if let message = subscriptions.errorMessage {
                     Section { Text(message).foregroundStyle(.red) }
@@ -56,97 +73,28 @@ struct SubscriptionView: View {
         .task { await subscriptions?.loadProducts() }
     }
 
-    @ViewBuilder
-    private func lifetimeSection(_ subscriptions: SubscriptionManager) -> some View {
-        let owned = { if case .lifetime = subscriptions.state { return true } else { return false } }()
-        Section {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Lifetime").font(.headline)
-                Text(PremiumFeature.upgradeIsOffered()
-                     ? "Pay once, no renewals. For one person, with website access. Includes every feature available when you buy; features added later may be offered as a one-time upgrade, or are included with a subscription."
-                     : "Pay once, no renewals. For one person, with website access.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                HStack {
-                    Text("\(subscriptions.product(ProductID.lifetime)?.displayPrice ?? "$79.99") once")
-                    Spacer()
-                    if owned {
-                        Label("Purchased", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
-                    } else if let product = subscriptions.product(ProductID.lifetime) {
-                        Button("Buy") { Task { await subscriptions.purchase(product) } }
-                            .buttonStyle(.borderedProminent)
-                            .disabled(subscriptions.isWorking)
-                    }
-                }
-                if owned, !subscriptions.lockedFeatures.isEmpty {
-                    Text("New since you bought: \(subscriptions.lockedFeatures.map(\.name).formatted()).")
-                        .font(.footnote)
-                    if let upgrade = subscriptions.product(ProductID.lifetimeUpgrade) {
-                        Button("Upgrade for \(upgrade.displayPrice)") { Task { await subscriptions.purchase(upgrade) } }
-                            .buttonStyle(.borderedProminent)
-                            .disabled(subscriptions.isWorking)
-                    }
-                }
-            }
-            .padding(.vertical, 4)
-        } header: {
-            Text("One-time purchase")
-        } footer: {
-            Text("A one-time purchase is charged once to your Apple ID. Restore Purchases brings it back on a new device.")
-        }
-    }
+}
 
-    @ViewBuilder
-    private func plan(
-        _ subscriptions: SubscriptionManager, title: String, blurb: String,
-        monthly: (id: String, fallbackPrice: String), annual: (id: String, fallbackPrice: String)
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title).font(.headline)
-            Text(blurb).font(.footnote).foregroundStyle(.secondary)
-            option(subscriptions, id: monthly.id, label: "Monthly", fallbackPrice: monthly.fallbackPrice, per: "month")
-            option(
-                subscriptions, id: annual.id, label: "Yearly", fallbackPrice: annual.fallbackPrice, per: "year",
-                savings: savings(subscriptions, monthly: monthly.id, annual: annual.id)
-            )
-        }
-        .padding(.vertical, 4)
-    }
+/// "About $3.33 a month." from the loaded yearly price.
+@MainActor
+private func perMonth(_ subscriptions: SubscriptionManager, id: String, fallback: String) -> String {
+    guard let product = subscriptions.product(id) else { return "About \(fallback) a month." }
+    let monthly = (product.price / 12).formatted(product.priceFormatStyle)
+    return "About \(monthly) a month."
+}
 
-    @ViewBuilder
-    private func option(
-        _ subscriptions: SubscriptionManager, id: String, label: String, fallbackPrice: String, per: String,
-        savings: String? = nil
-    ) -> some View {
-        let product = subscriptions.product(id)
-        HStack {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("\(label): \(product?.displayPrice ?? fallbackPrice)/\(per)")
-                if let savings {
-                    Text(savings).font(.caption).foregroundStyle(.green)
-                }
-            }
-            Spacer()
-            if subscriptions.currentProductID == id, case .subscribed = subscriptions.state {
-                Label("Current", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
-            } else if let product {
-                Button("Subscribe") { Task { await subscriptions.purchase(product) } }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(subscriptions.isWorking)
-            }
-        }
-    }
+/// "Save 33% compared with monthly." when both prices are loaded from the App Store.
+@MainActor
+private func savings(_ subscriptions: SubscriptionManager, monthly: String, annual: String) -> String {
+    guard let month = subscriptions.product(monthly)?.price, let year = subscriptions.product(annual)?.price,
+          month > 0 else { return "" }
+    let full = month * 12
+    guard year < full else { return "" }
+    let percent = NSDecimalNumber(decimal: (full - year) / full * 100).intValue
+    return percent > 0 ? "Save \(percent)% compared with monthly." : ""
+}
 
-    /// "Save 33%" when both prices are loaded from the App Store.
-    private func savings(_ subscriptions: SubscriptionManager, monthly: String, annual: String) -> String? {
-        guard let month = subscriptions.product(monthly)?.price, let year = subscriptions.product(annual)?.price,
-              month > 0 else { return nil }
-        let full = month * 12
-        guard year < full else { return nil }
-        let percent = NSDecimalNumber(decimal: (full - year) / full * 100).intValue
-        return percent > 0 ? "Save \(percent)% compared with monthly" : nil
-    }
-
+extension SubscriptionView {
     private func statusText(_ state: AccessState) -> String {
         switch state {
         case .trial(let end):
@@ -158,5 +106,84 @@ struct SubscriptionView: View {
         case .expired:
             "Your two free months have ended."
         }
+    }
+}
+
+/// One purchasable option: its price, a short description, and a Subscribe/Buy button (or a
+/// "Current" mark when it is the plan in force).
+private struct PlanRow: View {
+    @Environment(SubscriptionManager.self) private var subscriptions: SubscriptionManager?
+    let id: String
+    let title: String
+    let fallbackPrice: String
+    let per: String
+    var badge: String?
+    var detail: String?
+    var buyLabel = "Subscribe"
+
+    var body: some View {
+        let product = subscriptions?.product(id)
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 6) {
+                        Text(title).font(.headline)
+                        if let badge {
+                            Text(badge)
+                                .font(.caption2.weight(.semibold))
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(.green.opacity(0.2), in: Capsule())
+                                .foregroundStyle(.green)
+                        }
+                    }
+                    Text("\(product?.displayPrice ?? fallbackPrice)\(per)")
+                }
+                Spacer()
+                if isCurrent {
+                    Label("Current", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
+                } else if let product, let subscriptions {
+                    Button(buyLabel) { Task { await subscriptions.purchase(product) } }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(subscriptions.isWorking)
+                }
+            }
+            if let detail, !detail.isEmpty {
+                Text(detail).font(.footnote).foregroundStyle(.secondary)
+            }
+        }
+        .padding(.vertical, 4)
+    }
+
+    private var isCurrent: Bool {
+        guard let subscriptions else { return false }
+        if id == ProductID.lifetime, case .lifetime = subscriptions.state { return true }
+        if case .subscribed = subscriptions.state { return subscriptions.currentProductID == id }
+        return false
+    }
+}
+
+/// Team plans, one tap away so people buying for themselves aren't shown them.
+private struct TeamPlansView: View {
+    @Environment(SubscriptionManager.self) private var subscriptions: SubscriptionManager?
+
+    var body: some View {
+        List {
+            Section {
+                PlanRow(
+                    id: ProductID.teamAnnual, title: "Team yearly", fallbackPrice: "$34.99", per: "/user/year",
+                    badge: "Best value",
+                    detail: subscriptions.map { savings($0, monthly: ProductID.team, annual: ProductID.teamAnnual) }
+                )
+                PlanRow(id: ProductID.team, title: "Team monthly", fallbackPrice: "$3.99", per: "/user/month")
+            } header: {
+                Text("Per user")
+            } footer: {
+                Text("For people on a team. Unlimited trips, team reports and approvals. Only your Business trips are ever shared with a team. Subscriptions renew each month or year until cancelled at least 24 hours before the end of the current period; manage or cancel in your Apple ID account settings.")
+            }
+        }
+        .navigationTitle("Team plans")
+        .navigationBarTitleDisplayMode(.inline)
+        .task { await subscriptions?.loadProducts() }
     }
 }

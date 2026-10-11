@@ -8,13 +8,13 @@ enum ProductID {
     static let individualAnnual = "com.aisleweb.MilesProSync.individual.annual"
     /// Per user on a team: $3.99/month, unlimited trips (the server checks the team products).
     static let team = "com.aisleweb.MilesProSync.team.monthly"
-    /// The team plan billed yearly: $39.99/user/year.
+    /// The team plan billed yearly: $34.99/user/year.
     static let teamAnnual = "com.aisleweb.MilesProSync.team.annual"
     static let all = [individual, individualAnnual, team, teamAnnual]
     static let teamPlans = [team, teamAnnual]
 
     /// One-time purchases (non-consumable, outside the subscription group), individual use only.
-    /// Pay once: $79.99, no renewals. Covers every feature released up to the purchase date.
+    /// Pay once: $109.99, no renewals. Covers every feature released up to the purchase date.
     static let lifetime = "com.aisleweb.MilesProSync.individual.lifetime"
     /// A later one-time upgrade for a lifetime owner that adds the premium features released
     /// since they bought. Its price is set in App Store Connect.
