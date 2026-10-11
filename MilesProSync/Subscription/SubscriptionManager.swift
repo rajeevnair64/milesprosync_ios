@@ -41,8 +41,13 @@ final class SubscriptionManager {
     /// Premium features a lifetime owner doesn't have yet (empty for everyone else), so the plans
     /// screen can offer the upgrade.
     var lockedFeatures: [PremiumFeature] {
-        guard case .lifetime = state else { return [] }
+        guard PremiumFeature.upgradeIsOffered(), case .lifetime = state else { return [] }
         return PremiumFeature.all.filter { !state.includes($0) }
+    }
+
+    /// Whether a premium feature is available now. Until upgrades are offered, everything is.
+    func hasAccess(to feature: PremiumFeature) -> Bool {
+        !PremiumFeature.upgradeIsOffered() || state.includes(feature)
     }
 
     func loadProducts() async {

@@ -62,7 +62,9 @@ struct SubscriptionView: View {
         Section {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Lifetime").font(.headline)
-                Text("Pay once, no renewals. For one person, with website access. Includes every feature available when you buy; features added later may be offered as a one-time upgrade, or are included with a subscription.")
+                Text(PremiumFeature.upgradeIsOffered()
+                     ? "Pay once, no renewals. For one person, with website access. Includes every feature available when you buy; features added later may be offered as a one-time upgrade, or are included with a subscription."
+                     : "Pay once, no renewals. For one person, with website access.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                 HStack {

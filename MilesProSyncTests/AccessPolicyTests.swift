@@ -105,6 +105,15 @@ struct AccessPolicyTests {
         #expect(after.includes(feature))
     }
 
+    @Test func upgradesStayHiddenUntilACoupleOfFeaturesExist() {
+        let one = PremiumFeature(id: "a", name: "A", releasedAt: date(2026, 9, 1))
+        let two = PremiumFeature(id: "b", name: "B", releasedAt: date(2026, 10, 1))
+        #expect(!PremiumFeature.upgradeIsOffered(among: []))
+        #expect(!PremiumFeature.upgradeIsOffered(among: [one]))
+        #expect(PremiumFeature.upgradeIsOffered(among: [one, two]))
+        #expect(!PremiumFeature.upgradeIsOffered())
+    }
+
     @Test func anUpgradeAloneUnlocksNothing() {
         #expect(AccessPolicy.lifetimeCoverage(purchasedAt: nil, upgradedAt: date(2027, 2, 1)) == nil)
     }

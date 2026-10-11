@@ -35,6 +35,13 @@ struct PremiumFeature: Identifiable, Equatable, Sendable {
     let releasedAt: Date
 
     static let all: [PremiumFeature] = []
+
+    /// Upgrades stay hidden, and no feature is gated, until this many premium features exist.
+    static let featuresNeededToOffer = 2
+
+    static func upgradeIsOffered(among features: [PremiumFeature] = all) -> Bool {
+        features.count >= featuresNeededToOffer
+    }
 }
 
 enum Plan: String, Equatable, Sendable {
