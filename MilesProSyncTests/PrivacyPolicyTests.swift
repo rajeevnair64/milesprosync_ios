@@ -29,7 +29,7 @@ struct PrivacyPolicyTests {
 
     @Test func bundledPolicyLoadsAndCoversDeletedTrips() {
         let blocks = PolicyDocument.load()
-        #expect(blocks.first == .title("Miles Pro Sync Privacy Policy"))
+        #expect(blocks.first == .title("MilesProSync Privacy Policy"))
         #expect(blocks.contains(.heading("Deleted trips")))
         #expect(blocks.contains(.heading("Retention")))
     }
