@@ -65,6 +65,9 @@ struct DriveStateMachine {
     private var candidateSawDrivingSpeed = false
     private var lastMovingAt: Date?
     private var stoppedSince: Date?
+    /// The latest fix seen while recording, where a manual finish ends the trip if the caller has
+    /// no fresher one.
+    private var lastRecordingFix: CLLocation?
 
     init(config: Configuration = Configuration()) {
         self.config = config
@@ -78,6 +81,18 @@ struct DriveStateMachine {
         phase = .recording
         self.lastMovingAt = lastMovingAt
         stoppedSince = nil
+    }
+
+    /// The driver ended the trip (stopped at a destination and tapped Finish). Closes the trip
+    /// where the vehicle is now and goes idle there, so the next movement is a new trip that
+    /// starts at this stop. Does nothing unless a trip is being recorded.
+    mutating func finishManually(currentLocation: CLLocation?, now: Date) -> [Action] {
+        guard phase == .recording || phase == .candidateStopped,
+              let end = currentLocation ?? lastRecordingFix else { return [] }
+        // Already stopped: the trip ended when the vehicle last moved, not when Finish was tapped.
+        let stopped = phase == .candidateStopped || stoppedSince != nil
+        let endedAt = min(stopped ? (lastMovingAt ?? now) : now, now)
+        return [.finalizeTrip(end: end, endedAt: endedAt)] + enterIdle(anchor: end)
     }
 
     /// Gives idle monitoring a starting position after a relaunch, when no trip has ended yet.
@@ -131,6 +146,7 @@ struct DriveStateMachine {
             return []
 
         case .recording:
+            lastRecordingFix = location
             // Poor or stationary fixes still drive stop detection (a parking garage has weak
             // GPS), they just aren't added to the route.
             if speed >= config.movingSpeed {
@@ -146,6 +162,7 @@ struct DriveStateMachine {
             return []
 
         case .candidateStopped:
+            lastRecordingFix = location
             if speed >= config.movingSpeed {
                 // Resumed driving (e.g. was just a red light) — back to recording.
                 phase = .recording
@@ -173,6 +190,7 @@ struct DriveStateMachine {
         idleAnchor = anchor
         lastMovingAt = nil
         stoppedSince = nil
+        lastRecordingFix = nil
         return [.returnToIdle]
     }
 

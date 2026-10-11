@@ -99,6 +99,16 @@ final class Trip {
         revision += 1
     }
 
+    /// What the UI shows for the start: the address, or a placeholder while it is being looked up.
+    var startAddressText: String {
+        startAddress ?? (isInProgress ? "Locating\u{2026}" : "Unknown")
+    }
+
+    /// What the UI shows for the end: the address, or "In Progress" while the trip is recording.
+    var endAddressText: String {
+        isInProgress ? "In Progress" : (endAddress ?? "Unknown")
+    }
+
     var startCoordinate: CLLocationCoordinate2D {
         CLLocationCoordinate2D(latitude: startLatitude, longitude: startLongitude)
     }

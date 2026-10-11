@@ -142,8 +142,14 @@ enum XLSXExporter {
         "<c r=\"\(column)\(row)\"><v>\(String(format: "%.\(decimals)f", value))</v></c>"
     }
 
+    /// Escapes markup and drops characters XML 1.0 can't represent (control characters other
+    /// than tab, newline and carriage return), which make Excel report the file as corrupt.
     private static func xmlEscape(_ value: String) -> String {
-        value
+        var scalars = String.UnicodeScalarView()
+        scalars.append(contentsOf: value.unicodeScalars.filter {
+            $0.value >= 0x20 ? $0.value != 0xFFFE && $0.value != 0xFFFF : [0x9, 0xA, 0xD].contains($0.value)
+        })
+        return String(scalars)
             .replacingOccurrences(of: "&", with: "&amp;")
             .replacingOccurrences(of: "<", with: "&lt;")
             .replacingOccurrences(of: ">", with: "&gt;")

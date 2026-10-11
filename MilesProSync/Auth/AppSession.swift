@@ -30,7 +30,7 @@ final class UserSession: Identifiable {
         }
         let tripSync = TripSyncService(container: container, client: client, defaults: defaults)
         self.tripSync = tripSync
-        driveDetection = DriveDetectionService(modelContainer: container)
+        driveDetection = DriveDetectionService(modelContainer: container, defaults: defaults)
         driveDetection.onTripFinished = { tripSync.syncNow() }
     }
 
@@ -152,7 +152,14 @@ final class AppSession {
             accountStore.save(account)
             self.account = account
         }
-        guard let current, let token = credential.identityToken, let nonce else { return }
+        guard let current else { return }
+        guard let token = credential.identityToken, let nonce else {
+            // Linked, but nothing to exchange for a cloud session: say so rather than looking connected.
+            if apiConfig != nil {
+                linkError = "Sign in with Apple didn't return a sign-in token. Try connecting again."
+            }
+            return
+        }
         Task {
             do {
                 try await current.tripSync.connectWithApple(identityToken: token, nonce: nonce.raw)
@@ -193,6 +200,11 @@ final class AppSession {
         guard let current else { return }
         try await current.tripSync.deleteAccount()
         unlinkApple()
+    }
+
+    /// Ends the trip being recorded (the driver tapped Finish Trip); the next drive is a new trip.
+    func finishCurrentTrip() {
+        current?.driveDetection.finishCurrentTrip()
     }
 
     // MARK: - Lifecycle

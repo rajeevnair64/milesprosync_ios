@@ -63,6 +63,7 @@ struct DriveDetectionServiceTests {
         )
         service = DriveDetectionService(
             modelContainer: container,
+            defaults: UserDefaults(suiteName: "DriveDetectionServiceTests-\(UUID().uuidString)")!,
             locationManager: locations,
             reverseGeocode: { latitude, _ in "Near \(String(format: "%.3f", latitude))" }
         )

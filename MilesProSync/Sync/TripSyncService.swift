@@ -52,6 +52,9 @@ final class TripSyncService {
     @ObservationIgnored private let retryScheduler: any SyncRetryScheduler
     @ObservationIgnored private var hasRestoredSession = false
     @ObservationIgnored private var needsAnotherPass = false
+    /// Bumped on sign-in, sign-out and account deletion. A pass that started under an earlier
+    /// value must not report results or mark trips uploaded: they belong to another session.
+    @ObservationIgnored private var accountEpoch = 0
     @ObservationIgnored private var backgroundTask: UIBackgroundTaskIdentifier = .invalid
     @ObservationIgnored private var debouncedSync: Task<Void, Never>?
     @ObservationIgnored private var saveObserver: (any NSObjectProtocol)?
@@ -130,6 +133,8 @@ final class TripSyncService {
     func signOut() {
         guard let client else { return }
         hasRestoredSession = true
+        accountEpoch += 1
+        debouncedSync?.cancel()
         Task { await client.signOut() }
         signedInEmail = nil
         lastError = nil
@@ -142,12 +147,16 @@ final class TripSyncService {
         guard let client else { return }
         try await client.deleteAccount()
         hasRestoredSession = true
+        accountEpoch += 1
+        debouncedSync?.cancel()
         signedInEmail = nil
         lastError = nil
         lastSyncedAt = nil
     }
 
     private func didSignIn(_ session: AuthSession) {
+        // Before the reset below, so an upload still in flight can't mark trips uploaded afterwards.
+        accountEpoch += 1
         if defaults.string(forKey: Self.lastUserIDKey) != session.userID {
             // A different account has none of these trips yet, so everything uploads again.
             resetUploadState()
@@ -189,7 +198,7 @@ final class TripSyncService {
         repeat {
             needsAnotherPass = false
             await syncPendingTrips()
-        } while needsAnotherPass && lastError == nil && !Task.isCancelled
+        } while needsAnotherPass && lastError == nil && signedInEmail != nil && !Task.isCancelled
         isSyncing = false
         endBackgroundTask()
         if signedInEmail != nil, pendingCount > 0 {
@@ -202,6 +211,7 @@ final class TripSyncService {
     func syncPendingTrips() async {
         guard let client else { return }
         defer { refreshPendingCount() }
+        let epoch = accountEpoch
 
         let pending: [(payload: TripPayload, revision: Int)]
         do {
@@ -217,8 +227,13 @@ final class TripSyncService {
             let batch = Array(pending[start..<min(start + Self.batchSize, pending.count)])
             do {
                 try await client.upsertTrips(batch.map(\.payload))
+                guard epoch == accountEpoch else { return }
                 try markUploaded(batch)
             } catch {
+                // Cancelled by iOS ending a background task, or signed out meanwhile: not an
+                // error to show. The trips stay pending.
+                if error is CancellationError || (error as? URLError)?.code == .cancelled { return }
+                guard epoch == accountEpoch else { return }
                 lastError = error.localizedDescription
                 if case SyncError.sessionExpired = error {
                     signedInEmail = nil
@@ -226,6 +241,7 @@ final class TripSyncService {
                 return
             }
         }
+        guard epoch == accountEpoch else { return }
         lastError = nil
         lastSyncedAt = Date()
     }

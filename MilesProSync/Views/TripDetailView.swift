@@ -7,6 +7,8 @@ struct TripDetailView: View {
     @Bindable var trip: Trip
     @State private var cameraPosition: MapCameraPosition = .automatic
     @State private var confirmingDelete = false
+    @State private var confirmingFinish = false
+    @Environment(AppSession.self) private var appSession
     @FocusState private var notesFocused: Bool
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
@@ -40,10 +42,21 @@ struct TripDetailView: View {
                             ? "Started \(Formatters.timeOnly.string(from: trip.startDate)), recording"
                             : "\(Formatters.timeOnly.string(from: trip.startDate)) \u{2013} \(Formatters.timeOnly.string(from: trip.endDate))"
                     )
-                    LabeledRow(label: "From", value: trip.startAddress ?? "Unknown")
-                    LabeledRow(label: "To", value: trip.endAddress ?? "Unknown")
+                    LabeledRow(label: "From", value: trip.startAddressText)
+                    LabeledRow(label: "To", value: trip.endAddressText)
                 }
                 .padding(.horizontal)
+
+                if trip.isInProgress {
+                    Button {
+                        confirmingFinish = true
+                    } label: {
+                        Label("Finish Trip", systemImage: "flag.checkered")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .padding(.horizontal)
+                }
 
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Classification")
@@ -81,6 +94,11 @@ struct TripDetailView: View {
                 }
                 .disabled(trip.isInProgress)
             }
+        }
+        .confirmationDialog("Finish this trip here?", isPresented: $confirmingFinish, titleVisibility: .visible) {
+            Button("Finish Trip") { appSession.finishCurrentTrip() }
+        } message: {
+            Text("The trip ends at your current location. Driving on starts a new trip.")
         }
         .confirmationDialog("Delete this trip?", isPresented: $confirmingDelete, titleVisibility: .visible) {
             Button("Delete Trip", role: .destructive) {

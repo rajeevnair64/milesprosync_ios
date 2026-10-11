@@ -7,6 +7,8 @@ struct TripListView: View {
     @Environment(\.modelContext) private var modelContext
     @State private var showingExport = false
     @State private var showingSettings = false
+    @State private var confirmingFinish = false
+    @Environment(AppSession.self) private var appSession
 
     var body: some View {
         NavigationStack {
@@ -19,6 +21,16 @@ struct TripListView: View {
                             }
                             // A trip still being recorded can't be deleted until it finishes.
                             .deleteDisabled(trip.isInProgress)
+                            .swipeActions(edge: .leading) {
+                                if trip.isInProgress {
+                                    Button {
+                                        confirmingFinish = true
+                                    } label: {
+                                        Label("Finish", systemImage: "flag.checkered")
+                                    }
+                                    .tint(.green)
+                                }
+                            }
                         }
                         .onDelete { offsets in
                             delete(offsets.map { section.trips[$0] })
@@ -47,6 +59,11 @@ struct TripListView: View {
                     }
                     .disabled(trips.isEmpty)
                 }
+            }
+            .confirmationDialog("Finish this trip here?", isPresented: $confirmingFinish, titleVisibility: .visible) {
+                Button("Finish Trip") { appSession.finishCurrentTrip() }
+            } message: {
+                Text("The trip ends at your current location. Driving on starts a new trip.")
             }
             .sheet(isPresented: $showingExport) {
                 ExportView(trips: trips)

@@ -8,6 +8,8 @@ struct TripEndpoints: Sendable {
     let tripID: PersistentIdentifier
     let start: CLLocationCoordinate2D
     let end: CLLocationCoordinate2D
+    /// Already resolved start address, if any, so it isn't looked up again.
+    var startAddress: String? = nil
 }
 
 /// What `recoverInProgressTrips` found after a relaunch.
@@ -82,7 +84,7 @@ actor TripRecorder {
         finish(trip, at: endLocation.coordinate, endedAt: endedAt)
         saveContext()
         lastPersistedPointByTrip[tripID] = nil
-        return TripEndpoints(tripID: tripID, start: trip.startCoordinate, end: trip.endCoordinate)
+        return TripEndpoints(tripID: tripID, start: trip.startCoordinate, end: trip.endCoordinate, startAddress: trip.startAddress)
     }
 
     private func finish(_ trip: Trip, at end: CLLocationCoordinate2D, endedAt: Date) {
@@ -133,7 +135,8 @@ actor TripRecorder {
             }
             finish(trip, at: lastPoint?.coordinate ?? trip.startCoordinate, endedAt: lastActivityAt)
             recovery.finished.append(TripEndpoints(
-                tripID: trip.persistentModelID, start: trip.startCoordinate, end: trip.endCoordinate
+                tripID: trip.persistentModelID, start: trip.startCoordinate, end: trip.endCoordinate,
+                startAddress: trip.startAddress
             ))
         }
         saveContext()
@@ -149,6 +152,25 @@ actor TripRecorder {
             predicate: #Predicate {
                 !$0.isInProgress && $0.endDate > cutoff && ($0.startAddress == nil || $0.endAddress == nil)
             },
+            sortBy: [SortDescriptor(\.endDate, order: .reverse)]
+        )
+        descriptor.fetchLimit = limit
+        let trips = (try? modelContext.fetch(descriptor)) ?? []
+        return trips.map {
+            TripEndpoints(
+                tripID: $0.persistentModelID, start: $0.startCoordinate, end: $0.endCoordinate,
+                startAddress: $0.startAddress
+            )
+        }
+    }
+
+    /// Finished trips from the last `window`, newest first, whether or not they have addresses.
+    /// Used to look addresses up again after the address format changed. `startAddress` is left
+    /// nil so both ends are resolved afresh.
+    func recentFinishedTrips(within window: TimeInterval, now: Date, limit: Int) -> [TripEndpoints] {
+        let cutoff = now.addingTimeInterval(-window)
+        var descriptor = FetchDescriptor<Trip>(
+            predicate: #Predicate { !$0.isInProgress && $0.endDate > cutoff },
             sortBy: [SortDescriptor(\.endDate, order: .reverse)]
         )
         descriptor.fetchLimit = limit

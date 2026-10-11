@@ -21,6 +21,7 @@ final class DriveDetectionService {
     private let motionActivityManager = CMMotionActivityManager()
     private let recorder: TripRecorder
     private let reverseGeocode: @Sendable (Double, Double) async -> String?
+    private let defaults: UserDefaults
 
     private var machine = DriveStateMachine()
     private var hasStarted = false
@@ -40,6 +41,7 @@ final class DriveDetectionService {
     /// `locationManager` and `reverseGeocode` default to the system's; tests pass scripted ones.
     init(
         modelContainer: ModelContainer,
+        defaults: UserDefaults = .standard,
         locationManager: (any LocationManaging)? = nil,
         reverseGeocode: @escaping @Sendable (Double, Double) async -> String? = { latitude, longitude in
             await GeocodingService.shared.reverseGeocode(latitude: latitude, longitude: longitude)
@@ -48,9 +50,27 @@ final class DriveDetectionService {
         let locationManager = locationManager ?? SystemLocationManager()
         self.locationManager = locationManager
         self.reverseGeocode = reverseGeocode
+        self.defaults = defaults
         self.recorder = TripRecorder(modelContainer: modelContainer)
         self.authorizationStatus = locationManager.authorizationStatus
         locationManager.events = self
+    }
+
+    /// Ends the trip being recorded where the vehicle is now (the driver stopped at a destination
+    /// and tapped Finish). Whatever follows is recorded as a new trip. A trip left "in progress"
+    /// that nothing is recording is finished at its last point instead.
+    func finishCurrentTrip() {
+        enqueue {
+            guard !self.isStopped else { return }
+            let actions = self.machine.finishManually(
+                currentLocation: self.locationManager.location, now: Date()
+            )
+            if actions.isEmpty {
+                if self.currentTripID == nil { await self.finishStaleTrips() }
+            } else {
+                await self.perform(actions)
+            }
+        }
     }
 
     /// Completes once everything queued so far (recovery, location fixes, region exits) has run.
@@ -80,10 +100,27 @@ final class DriveDetectionService {
         default:
             // Without access nothing can resume a trip left in progress, so finish it where it
             // stopped instead of leaving it "Recording" (and out of exports and sync) indefinitely.
-            guard !hasFinishedStaleTrips else { break }
+            // If access was lost while running, also drop the in-memory trip and monitoring so
+            // regaining access starts cleanly instead of being ignored by `hasStarted`.
+            let wasRunning = hasStarted
+            hasStarted = false
+            guard wasRunning || !hasFinishedStaleTrips else { break }
             hasFinishedStaleTrips = true
-            enqueue { await self.finishStaleTrips() }
+            enqueue {
+                if wasRunning { self.resetAfterLosingAccess() }
+                await self.finishStaleTrips()
+            }
         }
+    }
+
+    private func resetAfterLosingAccess() {
+        currentTripID = nil
+        machine = DriveStateMachine()
+        locationManager.stopUpdatingLocation()
+        locationManager.stopMonitoringSignificantLocationChanges()
+        stopMonitoringParkedRegion()
+        stopMonitoringRouteRegion()
+        motionActivityManager.stopActivityUpdates()
     }
 
     private func finishStaleTrips() async {
@@ -91,7 +128,7 @@ final class DriveDetectionService {
         guard !recovery.finished.isEmpty else { return }
         Task {
             for trip in recovery.finished {
-                await self.lookUpAddresses(for: trip.tripID, start: trip.start, end: trip.end)
+                await self.lookUpAddresses(for: trip.tripID, start: trip.start, end: trip.end, knownStart: trip.startAddress)
             }
             self.onTripFinished?()
         }
@@ -102,6 +139,9 @@ final class DriveDetectionService {
     static let resumeWindow: TimeInterval = 10 * 60
     private static let addressRetryWindow: TimeInterval = 30 * 24 * 3600
     private static let addressRetryLimit = 20
+    /// Raised when the saved address format changes, so older trips are looked up again once.
+    private static let addressFormatVersion = 2
+    private static let addressFormatKey = "drive.addressFormatVersion"
 
     /// Runs on every launch, including background relaunches. Resumes a trip interrupted moments
     /// ago, finishes any interrupted longer ago, and fills in addresses that were never looked up.
@@ -117,14 +157,24 @@ final class DriveDetectionService {
             beginIdleMonitoring()
         }
 
-        let missing = await recorder.tripsMissingAddresses(
+        var missing = await recorder.tripsMissingAddresses(
             within: Self.addressRetryWindow, now: now, limit: Self.addressRetryLimit
         )
+        if defaults.integer(forKey: Self.addressFormatKey) < Self.addressFormatVersion {
+            // Addresses saved by an earlier build are short ("Main St, Austin, TX"): look the
+            // most recent ones up again, once, in the full format.
+            let known = Set(missing.map(\.tripID))
+            let refresh = await recorder.recentFinishedTrips(
+                within: Self.addressRetryWindow, now: now, limit: Self.addressRetryLimit
+            )
+            missing += refresh.filter { !known.contains($0.tripID) }
+            defaults.set(Self.addressFormatVersion, forKey: Self.addressFormatKey)
+        }
         guard !missing.isEmpty || !recovery.finished.isEmpty else { return }
         // Not awaited: geocoding is a network call and shouldn't hold up the action queue.
         Task {
             for trip in missing {
-                await self.lookUpAddresses(for: trip.tripID, start: trip.start, end: trip.end)
+                await self.lookUpAddresses(for: trip.tripID, start: trip.start, end: trip.end, knownStart: trip.startAddress)
             }
             self.onTripFinished?()
         }
@@ -166,10 +216,35 @@ final class DriveDetectionService {
         motionActivityManager.stopActivityUpdates()
         machine.isAutomotive = nil
         stopMonitoringRouteRegion()
-        if machine.idleAnchor == nil, let lastKnown = locationManager.location {
-            machine.seedIdleAnchor(lastKnown)
+        if machine.idleAnchor == nil {
+            // The remembered parking spot beats the cached fix: after a relaunch caused by a drive
+            // starting, the cached fix is already along the route and would hide the start.
+            if let saved = savedIdleAnchor() {
+                machine.seedIdleAnchor(saved)
+            } else if let lastKnown = locationManager.location {
+                machine.seedIdleAnchor(lastKnown)
+            }
         }
+        if let anchor = machine.idleAnchor { saveIdleAnchor(anchor) }
         monitorParkedRegion()
+    }
+
+    private static let idleAnchorKey = "drive.idleAnchor"
+
+    private func saveIdleAnchor(_ anchor: CLLocation) {
+        defaults.set([
+            anchor.coordinate.latitude, anchor.coordinate.longitude,
+            anchor.horizontalAccuracy, anchor.timestamp.timeIntervalSince1970,
+        ], forKey: Self.idleAnchorKey)
+    }
+
+    private func savedIdleAnchor() -> CLLocation? {
+        guard let values = defaults.array(forKey: Self.idleAnchorKey) as? [Double], values.count == 4 else { return nil }
+        return CLLocation(
+            coordinate: CLLocationCoordinate2D(latitude: values[0], longitude: values[1]),
+            altitude: 0, horizontalAccuracy: values[2], verticalAccuracy: -1,
+            timestamp: Date(timeIntervalSince1970: values[3])
+        )
     }
 
     private func monitorParkedRegion() {
@@ -278,6 +353,13 @@ final class DriveDetectionService {
                 }
                 currentTripID = tripID
                 if let last = points.last { followRoute(with: last) }
+                // The start is known as soon as the trip begins; resolve it now so the trip shows
+                // where it began while it is still recording.
+                let start = first.coordinate
+                Task {
+                    guard let address = await self.reverseGeocode(start.latitude, start.longitude) else { return }
+                    await self.recorder.setAddresses(startAddress: address, endAddress: nil, for: tripID)
+                }
 
             case .appendPoint(let location):
                 guard let currentTripID else { continue }
@@ -290,17 +372,25 @@ final class DriveDetectionService {
                 guard let endpoints = await recorder.finalizeTrip(tripID, endLocation: end, endedAt: endedAt) else { continue }
                 // Not awaited: geocoding is a network call and shouldn't hold up the queue.
                 Task {
-                    await self.lookUpAddresses(for: tripID, start: endpoints.start, end: endpoints.end)
+                    await self.lookUpAddresses(for: tripID, start: endpoints.start, end: endpoints.end, knownStart: endpoints.startAddress)
                     self.onTripFinished?()
                 }
             }
         }
     }
 
-    private func lookUpAddresses(for tripID: PersistentIdentifier, start: CLLocationCoordinate2D, end: CLLocationCoordinate2D) async {
+    private func lookUpAddresses(
+        for tripID: PersistentIdentifier, start: CLLocationCoordinate2D, end: CLLocationCoordinate2D,
+        knownStart: String? = nil
+    ) async {
         // Sequential on purpose: reverse geocoding is rate-limited, and firing both at once
         // tends to get one of them rejected.
-        let startAddress = await reverseGeocode(start.latitude, start.longitude)
+        let startAddress: String?
+        if let knownStart {
+            startAddress = knownStart
+        } else {
+            startAddress = await reverseGeocode(start.latitude, start.longitude)
+        }
         let endAddress = await reverseGeocode(end.latitude, end.longitude)
         await recorder.setAddresses(startAddress: startAddress, endAddress: endAddress, for: tripID)
     }

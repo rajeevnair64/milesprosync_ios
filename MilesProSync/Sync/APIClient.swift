@@ -57,6 +57,9 @@ actor APIClient {
     /// The refresh currently in flight. Concurrent callers share it: a refresh token is single-use,
     /// so a second request with the same token would be rejected and end the session.
     private var refreshTask: Task<AuthSession, Error>?
+    /// Bumped whenever the session is replaced or cleared. A refresh that finds it changed while
+    /// its request was in flight (the user signed out) must not write its result back.
+    private var sessionGeneration = 0
 
     /// Refresh this long before expiry so a request never goes out with a token that lapses in flight.
     private let refreshLeeway: TimeInterval = 60
@@ -108,7 +111,13 @@ actor APIClient {
             try await callDeleteAccount(accessToken: validSession().accessToken)
         } catch SyncError.server(status: 401, _) {
             guard let session else { throw SyncError.notSignedIn }
-            try await callDeleteAccount(accessToken: refresh(session).accessToken)
+            let token = try await refresh(session).accessToken
+            do {
+                try await callDeleteAccount(accessToken: token)
+            } catch SyncError.server(status: 401, _) {
+                store(nil)
+                throw SyncError.sessionExpired
+            }
         }
         store(nil)
     }
@@ -130,7 +139,15 @@ actor APIClient {
         } catch SyncError.server(status: 401, _) {
             // Token revoked or device clock skewed — refresh once and retry.
             guard let session else { throw SyncError.notSignedIn }
-            try await upsert(body, accessToken: refresh(session).accessToken)
+            let token = try await refresh(session).accessToken
+            do {
+                try await upsert(body, accessToken: token)
+            } catch SyncError.server(status: 401, _) {
+                // A freshly issued token was rejected too (e.g. the account is gone): only a
+                // new sign-in can recover.
+                store(nil)
+                throw SyncError.sessionExpired
+            }
         }
     }
 
@@ -160,6 +177,7 @@ actor APIClient {
     }
 
     private func performRefresh(_ current: AuthSession) async throws -> AuthSession {
+        let generation = sessionGeneration
         let data: Data
         do {
             data = try await send(jsonRequest(
@@ -169,9 +187,11 @@ actor APIClient {
         } catch SyncError.server(let status, _) where (400..<500).contains(status) && status != 429 && status != 408 {
             // Refresh token revoked or already used — only a fresh sign-in can recover. (429 is only
             // the server's request limit and 408 a timeout: stay signed in and try again later.)
-            store(nil)
+            if generation == sessionGeneration { store(nil) }
             throw SyncError.sessionExpired
         }
+        // Signed out (or replaced) while the request was in flight: don't resurrect the session.
+        guard generation == sessionGeneration else { throw SyncError.notSignedIn }
         guard var refreshed = decodeSession(data) else { throw SyncError.invalidResponse }
         refreshed.email = refreshed.email ?? current.email
         store(refreshed)
@@ -179,6 +199,7 @@ actor APIClient {
     }
 
     private func store(_ session: AuthSession?) {
+        sessionGeneration += 1
         self.session = session
         tokenStore.save(session)
     }

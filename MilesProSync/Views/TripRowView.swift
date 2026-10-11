@@ -40,7 +40,7 @@ struct TripRowView: View {
     }
 
     private var routeSummary: String {
-        "\(trip.startAddress ?? "Unknown") \u{2192} \(trip.endAddress ?? "Unknown")"
+        "\(trip.startAddressText) \u{2192} \(trip.endAddressText)"
     }
 
     private var timeRange: String {
