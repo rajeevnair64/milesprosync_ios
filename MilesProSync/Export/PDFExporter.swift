@@ -2,8 +2,8 @@ import Foundation
 import UIKit
 
 enum PDFExporter {
-    /// Date, Start, End, Miles, Classification, Reimbursement — sums to the 540pt printable width.
-    private static let columnWidths: [CGFloat] = [52, 125, 125, 38, 78, 122]
+    /// Date, Start, End, Miles, Classification, Purpose, Reimbursement — sums to the 540pt printable width.
+    private static let columnWidths: [CGFloat] = [50, 108, 108, 36, 68, 62, 108]
     private static let columnGap: CGFloat = 6
     private static let rowSpacing: CGFloat = 5
 
@@ -23,6 +23,7 @@ enum PDFExporter {
             .appendingPathExtension("pdf")
 
         let headers = ExportColumns.titles(rate: rate)
+        let fixedAmount = Reimbursement.fixedAmount(trips: trips, filter: filter, rate: rate)
 
         try renderer.writePDF(to: url) { context in
             context.beginPage()
@@ -36,7 +37,8 @@ enum PDFExporter {
                     trip.endAddress ?? "",
                     String(format: "%.1f", Reimbursement.displayedMiles(trip.distanceMiles)),
                     trip.classification.displayName,
-                    rate.format(Reimbursement.amount(miles: trip.distanceMiles, rate: rate.perMile)),
+                    trip.purpose ?? "",
+                    rate.format(Reimbursement.amount(for: trip, rate: rate)),
                 ]
                 if y + rowHeight(values, font: bodyFont) > bottom {
                     context.beginPage()
@@ -46,11 +48,19 @@ enum PDFExporter {
                 drawRow(values, font: bodyFont, margin: margin, y: &y)
             }
 
+            if fixedAmount > 0 {
+                let fixedRow = ["Fixed monthly amount (FAVR)", "", "", "", "", "", rate.format(fixedAmount)]
+                if y + rowHeight(fixedRow, font: bodyFont) > bottom {
+                    context.beginPage()
+                    y = margin
+                }
+                drawRow(fixedRow, font: bodyFont, margin: margin, y: &y)
+            }
             let totals = [
                 "Total", "", "",
                 String(format: "%.1f", ExportFetcher.totalMiles(trips)),
-                "",
-                rate.format(Reimbursement.total(trips, rate: rate.perMile)),
+                "", "",
+                rate.format(Reimbursement.total(trips, rate: rate) + fixedAmount),
             ]
             if y + 8 + rowHeight(totals, font: headerFont) > bottom {
                 context.beginPage()
@@ -64,7 +74,7 @@ enum PDFExporter {
     }
 
     private static func drawTitle(filter: ExportFilter, margin: CGFloat, y: CGFloat) -> CGFloat {
-        let title = "Miles Pro Sync — \(filter.monthTitle) (\(filter.classificationLabel))"
+        let title = "Miles Pro Sync — \(filter.periodTitle) (\(filter.classificationLabel))"
         let attributes: [NSAttributedString.Key: Any] = [.font: UIFont.boldSystemFont(ofSize: 16)]
         (title as NSString).draw(at: CGPoint(x: margin, y: y), withAttributes: attributes)
         return y + 22

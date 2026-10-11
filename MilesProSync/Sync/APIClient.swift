@@ -160,6 +160,35 @@ actor APIClient {
         _ = try await send(request)
     }
 
+    // MARK: - Authorized requests
+
+    /// A request with the signed-in account's token, refreshed and retried once if it was rejected.
+    /// `body` makes it a JSON request.
+    func authorized(_ method: String, path: String, body: [String: String]? = nil) async throws -> Data {
+        func request(token: String) throws -> URLRequest {
+            var request = URLRequest(url: endpoint(path))
+            request.httpMethod = method
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            if let body {
+                request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                request.httpBody = try JSONEncoder().encode(body)
+            }
+            return request
+        }
+        do {
+            return try await send(request(token: validSession().accessToken))
+        } catch SyncError.server(status: 401, _) {
+            guard let session else { throw SyncError.notSignedIn }
+            let token = try await refresh(session).accessToken
+            do {
+                return try await send(request(token: token))
+            } catch SyncError.server(status: 401, _) {
+                store(nil)
+                throw SyncError.sessionExpired
+            }
+        }
+    }
+
     // MARK: - Session
 
     private func validSession() async throws -> AuthSession {

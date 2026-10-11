@@ -94,6 +94,7 @@ actor TripRecorder {
         trip.distanceMiles = MileageCalculator.distanceMiles(for: trip.route)
         trip.isInProgress = false
         trip.revision += 1
+        ClassificationRules.load().apply(to: trip)
     }
 
     /// Stores looked-up addresses. A nil (failed lookup) never overwrites an address already

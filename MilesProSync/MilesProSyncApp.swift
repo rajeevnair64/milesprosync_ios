@@ -3,6 +3,7 @@ import SwiftUI
 @main
 struct MilesProSyncApp: App {
     @State private var appSession: AppSession
+    @State private var subscriptions = SubscriptionManager()
 
     init() {
         KeychainItem.clearAllIfFreshInstall()
@@ -17,6 +18,7 @@ struct MilesProSyncApp: App {
         WindowGroup {
             RootView()
                 .environment(appSession)
+                .environment(subscriptions)
         }
     }
 }

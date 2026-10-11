@@ -6,11 +6,70 @@ enum AppSettings {
     enum Key {
         static let countryCode = "settings.countryCode"
         static let mileageRate = "settings.mileageRate"
+        static let rateMode = "settings.rateMode"
+        static let favrFixedMonthly = "settings.favrFixedMonthly"
+        static let favrPerMile = "settings.favrPerMile"
+        static let favrMinMonthlyMiles = "settings.favrMinMonthlyMiles"
     }
+
+    /// How trips are paid. IRS is the default: each trip at the IRS rate for its year, updated
+    /// automatically. Custom and FAVR are the person's own values and are never changed for them.
+    enum RateMode: String, CaseIterable, Identifiable {
+        case irs, custom, favr
+
+        var id: String { rawValue }
+
+        var displayName: String {
+            switch self {
+            case .irs: "IRS rate"
+            case .custom: "My rate"
+            case .favr: "FAVR"
+            }
+        }
+    }
+
+    /// The rate before the IRS table existed (the 2026 IRS rate, the app's old fixed default).
+    static let fallbackIRSRate = 0.725
 
     static let defaultCountryCode = "US"
     /// IRS standard mileage rate for business use in 2026, in dollars per mile.
     static let defaultMileageRate = 0.725
+
+    /// The mode in effect. Before modes existed the app stored only a per-mile rate: a stored rate
+    /// other than the old default was the person's own, so it becomes Custom and keeps its value;
+    /// no stored rate, or the old default, means they were using the IRS rate. The result is
+    /// written, so a later change to the IRS table can't flip anyone between modes.
+    @discardableResult
+    static func resolveRateMode(defaults: UserDefaults) -> RateMode {
+        if let stored = defaults.string(forKey: Key.rateMode), let mode = RateMode(rawValue: stored) { return mode }
+        var mode = RateMode.irs
+        if defaults.object(forKey: Key.mileageRate) != nil {
+            let rate = defaults.double(forKey: Key.mileageRate)
+            if abs(rate - defaultMileageRate) > 0.0000_1 { mode = .custom }
+        }
+        defaults.set(mode.rawValue, forKey: Key.rateMode)
+        return mode
+    }
+
+    /// The reimbursement rate for the saved mode. `at` picks which year's IRS rate the label shows.
+    static func reimbursementRate(
+        mode: RateMode, customPerMile: Double, favrFixedMonthly: Double, favrPerMile: Double,
+        favrMinMonthlyMiles: Double, countryCode: String, at date: Date = .now,
+        table: [Int: Double] = IRSRates.table()
+    ) -> ReimbursementRate {
+        let symbol = currencySymbol(for: normalizedCountryCode(countryCode))
+        switch mode {
+        case .irs:
+            return ReimbursementRate(perMile: IRSRates.rate(on: date, in: table), currencySymbol: symbol, irsTable: table)
+        case .custom:
+            return ReimbursementRate(perMile: customPerMile, currencySymbol: symbol)
+        case .favr:
+            return ReimbursementRate(
+                perMile: favrPerMile, currencySymbol: symbol,
+                fixedMonthly: favrFixedMonthly, minMonthlyMiles: favrMinMonthlyMiles
+            )
+        }
+    }
 
     struct Country: Identifiable, Hashable {
         let code: String
@@ -18,8 +77,18 @@ enum AppSettings {
         var id: String { code }
     }
 
+    /// The countries the app is set up for. Only the United States for now (the IRS rate and US
+    /// reporting); `allCountries` is ready for when more are added.
+    static let countries: [Country] = allCountries.filter { $0.code == defaultCountryCode }
+
+    /// A stored country code, or the default if it is one the app isn't set up for (an earlier
+    /// version let any country be chosen).
+    static func normalizedCountryCode(_ code: String) -> String {
+        countries.contains { $0.code == code } ? code : defaultCountryCode
+    }
+
     /// Every ISO country/territory, sorted by its name in the user's language.
-    static let countries: [Country] = Locale.Region.isoRegions
+    static let allCountries: [Country] = Locale.Region.isoRegions
         .filter { $0.subRegions.isEmpty && $0.identifier.count == 2 && $0.identifier.allSatisfy(\.isLetter) }
         .compactMap { region in
             Locale.current.localizedString(forRegionCode: region.identifier)

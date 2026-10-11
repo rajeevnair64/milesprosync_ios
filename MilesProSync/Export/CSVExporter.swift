@@ -1,7 +1,7 @@
 import Foundation
 
 enum CSVExporter {
-    static func makeCSV(trips: [Trip], rate: ReimbursementRate) -> String {
+    static func makeCSV(trips: [Trip], rate: ReimbursementRate, fixedAmount: Double = 0) -> String {
         var lines = [
             ExportColumns.titles(rate: rate)
                 .map(csvField)
@@ -15,23 +15,30 @@ enum CSVExporter {
                 trip.endAddress ?? "",
                 String(format: "%.1f", Reimbursement.displayedMiles(trip.distanceMiles)),
                 trip.classification.displayName,
-                String(format: "%.2f", Reimbursement.amount(miles: trip.distanceMiles, rate: rate.perMile)),
+                trip.purpose ?? "",
+                String(format: "%.2f", Reimbursement.amount(for: trip, rate: rate)),
             ]
             lines.append(fields.map(csvField).joined(separator: ","))
         }
 
         let total = ExportFetcher.totalMiles(trips)
-        let totalAmount = Reimbursement.total(trips, rate: rate.perMile)
+        let totalAmount = Reimbursement.total(trips, rate: rate) + fixedAmount
         lines.append("")
+        if fixedAmount > 0 {
+            lines.append([
+                csvField("Fixed monthly amount (FAVR)"), "", "", "", "", "", String(format: "%.2f", fixedAmount),
+            ].joined(separator: ","))
+        }
         lines.append([
-            csvField("Total"), "", "", String(format: "%.1f", total), "", String(format: "%.2f", totalAmount),
+            csvField("Total"), "", "", String(format: "%.1f", total), "", "", String(format: "%.2f", totalAmount),
         ].joined(separator: ","))
 
         return lines.joined(separator: "\r\n")
     }
 
     static func export(trips: [Trip], filter: ExportFilter, rate: ReimbursementRate) throws -> URL {
-        let csv = makeCSV(trips: trips, rate: rate)
+        let fixed = Reimbursement.fixedAmount(trips: trips, filter: filter, rate: rate)
+        let csv = makeCSV(trips: trips, rate: rate, fixedAmount: fixed)
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent(ExportNaming.fileBaseName(filter: filter))
             .appendingPathExtension("csv")

@@ -29,6 +29,9 @@ final class Trip {
     /// Set when the user deletes the trip. Deleted trips are hidden from the list and exports but
     /// kept on the device and in the cloud as a record; see `markDeleted()`.
     var deletedAt: Date? = nil
+    /// Why the drive was made (e.g. "Client visit"), picked from the purposes in Settings. Kept on
+    /// the device and in exports; not part of the website upload.
+    var purpose: String? = nil
 
     @Relationship(deleteRule: .cascade, inverse: \RoutePoint.trip)
     var route: [RoutePoint] = []

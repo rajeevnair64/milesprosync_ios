@@ -8,9 +8,12 @@ struct AppSettingsTests {
         #expect(AppSettings.defaultMileageRate == 0.725)
     }
 
-    @Test func countryListContainsDefaultAndOnlyCountries() {
-        let codes = AppSettings.countries.map(\.code)
-        #expect(codes.contains(AppSettings.defaultCountryCode))
+    @Test func onlyTheUnitedStatesIsSetUp() {
+        #expect(AppSettings.countries.map(\.code) == ["US"])
+        #expect(AppSettings.normalizedCountryCode("US") == "US")
+        #expect(AppSettings.normalizedCountryCode("GB") == "US")
+        // The full list stays available for when more countries are added.
+        let codes = AppSettings.allCountries.map(\.code)
         #expect(codes.contains("CA"))
         #expect(!codes.contains("001")) // "World" is a region, not a country
         #expect(Set(codes).count == codes.count)

@@ -4,52 +4,42 @@ import SwiftUI
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @AppStorage(AppSettings.Key.countryCode) private var countryCode = AppSettings.defaultCountryCode
-    @AppStorage(AppSettings.Key.mileageRate) private var mileageRate = AppSettings.defaultMileageRate
-    /// Edited as text and saved on every keystroke: a value-formatted TextField only commits on
-    /// Return or focus loss, and the decimal keypad has no Return key.
-    @State private var rateText = ""
     @State private var showingWebsiteSetup = false
-
-    private var isUS: Bool { countryCode == "US" }
-
-    private var isRateValid: Bool {
-        AppSettings.parseRate(rateText) != nil
-    }
 
     var body: some View {
         NavigationStack {
             Form {
-                Section("Region") {
-                    Picker("Country", selection: $countryCode) {
-                        ForEach(AppSettings.countries) { country in
-                            Text(country.name).tag(country.code)
-                        }
+                Section {
+                    LabeledContent("Country", value: AppSettings.countryName(for: AppSettings.defaultCountryCode))
+                } header: {
+                    Text("Region")
+                } footer: {
+                    Text("Miles Pro Sync is set up for the United States for now. More countries are coming.")
+                }
+                ReimbursementSection()
+                Section {
+                    NavigationLink("Subscription") {
+                        SubscriptionView()
                     }
-                    .pickerStyle(.navigationLink)
+                    NavigationLink("Team") {
+                        TeamView()
+                    }
+                } header: {
+                    Text("Plan")
+                } footer: {
+                    Text("Two months free, then $4.99 per month, or $3.99 per user per month on a team.")
                 }
                 Section {
-                    LabeledContent("Rate (\(AppSettings.currencySymbol(for: countryCode))/mi)") {
-                        TextField("Rate", text: $rateText)
-                            .keyboardType(.decimalPad)
-                            .multilineTextAlignment(.trailing)
-                            .foregroundStyle(isRateValid ? Color.primary : Color.red)
+                    NavigationLink("Auto-Classification") {
+                        AutoClassificationView()
                     }
-                    Button(isUS ? "Reset to IRS Rate" : "Reset to Default Rate") {
-                        mileageRate = AppSettings.defaultMileageRate
-                        rateText = AppSettings.formatRate(mileageRate)
+                    NavigationLink("Trip Purposes") {
+                        PurposesView()
                     }
-                    .disabled(mileageRate == AppSettings.defaultMileageRate && isRateValid)
                 } header: {
-                    Text("Reimbursement")
+                    Text("Trips")
                 } footer: {
-                    if isRateValid {
-                        Text(isUS
-                            ? "Defaults to the 2026 IRS standard business mileage rate of $0.725 per mile."
-                            : "Defaults to the US IRS rate of 0.725 per mile. Enter your own country's rate.")
-                    } else {
-                        Text("Enter a number of 0 or more. Exports keep using \(AppSettings.formatRate(mileageRate)) until then.")
-                            .foregroundStyle(.red)
-                    }
+                    Text("Classify drives automatically by place or work hours, and manage the purposes you can tag trips with.")
                 }
                 WebsiteSyncSection(showingSetup: $showingWebsiteSetup)
                 Section("About") {
@@ -69,13 +59,9 @@ struct SettingsView: View {
                     Button("Done") { dismiss() }
                 }
             }
-            .onAppear { rateText = AppSettings.formatRate(mileageRate) }
-            .onChange(of: rateText) {
-                // Showing the stored rate (rounded to 3 decimals) must not write the rounded value back.
-                guard rateText != AppSettings.formatRate(mileageRate) else { return }
-                if let rate = AppSettings.parseRate(rateText) {
-                    mileageRate = rate
-                }
+            .onAppear {
+                // An earlier version let any country be chosen; only the United States is set up now.
+                countryCode = AppSettings.normalizedCountryCode(countryCode)
             }
         }
     }

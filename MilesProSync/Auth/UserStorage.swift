@@ -116,7 +116,7 @@ enum UserStorage {
     }
 
     private static func adoptLegacySettings(from legacy: UserDefaults, to defaults: UserDefaults) {
-        for key in [AppSettings.Key.countryCode, AppSettings.Key.mileageRate] {
+        for key in [AppSettings.Key.countryCode, AppSettings.Key.mileageRate, AppSettings.Key.rateMode] {
             guard defaults.object(forKey: key) == nil, let value = legacy.object(forKey: key) else { continue }
             defaults.set(value, forKey: key)
             legacy.removeObject(forKey: key)

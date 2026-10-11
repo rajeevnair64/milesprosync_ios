@@ -8,6 +8,8 @@ struct TripDetailView: View {
     @State private var cameraPosition: MapCameraPosition = .automatic
     @State private var confirmingDelete = false
     @State private var confirmingFinish = false
+    @State private var showingEdit = false
+    @AppStorage(TripPurposes.key) private var storedPurposes = TripPurposes.encode(TripPurposes.defaults)
     @Environment(AppSession.self) private var appSession
     @FocusState private var notesFocused: Bool
     @Environment(\.modelContext) private var modelContext
@@ -66,6 +68,20 @@ struct TripDetailView: View {
                 .padding(.horizontal)
 
                 VStack(alignment: .leading, spacing: 8) {
+                    Text("Purpose")
+                        .font(.headline)
+                    Picker("Purpose", selection: $trip.purpose) {
+                        Text("None").tag(String?.none)
+                        ForEach(purposeChoices, id: \.self) { purpose in
+                            Text(purpose).tag(String?.some(purpose))
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .onChange(of: trip.purpose) { try? modelContext.save() }
+                }
+                .padding(.horizontal)
+
+                VStack(alignment: .leading, spacing: 8) {
                     Text("Notes")
                         .font(.headline)
                     TextField(
@@ -86,6 +102,10 @@ struct TripDetailView: View {
         .navigationTitle("Trip Details")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button("Edit") { showingEdit = true }
+                    .disabled(trip.isInProgress)
+            }
             ToolbarItem(placement: .destructiveAction) {
                 Button(role: .destructive) {
                     confirmingDelete = true
@@ -109,8 +129,20 @@ struct TripDetailView: View {
         } message: {
             Text("It will be removed from your trip list and exports.")
         }
+        .sheet(isPresented: $showingEdit) {
+            ManualTripView(editing: trip)
+        }
+        .onChange(of: trip.startLatitude) { fitCamera() }
+        .onChange(of: trip.endLatitude) { fitCamera() }
         .onAppear { fitCamera() }
         .onDisappear { try? modelContext.save() }
+    }
+
+    /// The saved purposes, plus the trip's own if it was removed from the list since.
+    private var purposeChoices: [String] {
+        let saved = TripPurposes.parse(storedPurposes)
+        guard let current = trip.purpose, !saved.contains(current) else { return saved }
+        return saved + [current]
     }
 
     private func fitCamera() {

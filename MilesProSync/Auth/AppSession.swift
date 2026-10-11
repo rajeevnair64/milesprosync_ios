@@ -15,6 +15,8 @@ final class UserSession: Identifiable {
     let defaults: UserDefaults
     let tripSync: TripSyncService
     let driveDetection: DriveDetectionService
+    /// The website's API, for team features; nil when this build has no server configured.
+    let apiClient: APIClient?
 
     nonisolated var id: String { storageKey }
 
@@ -28,16 +30,25 @@ final class UserSession: Identifiable {
         let client = apiConfig.map {
             APIClient(config: $0, tokenStore: KeychainTokenStore(userKey: UserStorage.folderName(for: storageKey)))
         }
+        apiClient = client
         let tripSync = TripSyncService(container: container, client: client, defaults: defaults)
         self.tripSync = tripSync
         driveDetection = DriveDetectionService(modelContainer: container, defaults: defaults)
+        // After the free period, with no subscription, new drives aren't recorded.
+        driveDetection.isRecordingAllowed = { AccessStore.isRecordingAllowed() }
         driveDetection.onTripFinished = { tripSync.syncNow() }
+        // Settings from before reimbursement methods existed: settle which one this account was using.
+        AppSettings.resolveRateMode(defaults: defaults)
     }
 
     func start() {
         _ = try? TripRetention.purgeExpiredDeletedTrips(in: container)
         tripSync.start()
         driveDetection.start()
+        // A new year's IRS rate reaches people on the default rate without an app release.
+        if let baseURL = apiClient?.config.baseURL {
+            Task { await IRSRates.refresh(baseURL: baseURL) }
+        }
     }
 
     func stop() {

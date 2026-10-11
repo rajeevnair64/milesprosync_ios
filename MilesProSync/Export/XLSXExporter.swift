@@ -23,7 +23,10 @@ enum XLSXExporter {
         try addEntry(to: archive, path: "_rels/.rels", contents: rootRelsXML)
         try addEntry(to: archive, path: "xl/workbook.xml", contents: workbookXML)
         try addEntry(to: archive, path: "xl/_rels/workbook.xml.rels", contents: workbookRelsXML)
-        try addEntry(to: archive, path: "xl/worksheets/sheet1.xml", contents: worksheetXML(trips: trips, rate: rate))
+        try addEntry(to: archive, path: "xl/worksheets/sheet1.xml", contents: worksheetXML(
+            trips: trips, rate: rate,
+            fixedAmount: Reimbursement.fixedAmount(trips: trips, filter: filter, rate: rate)
+        ))
 
         return url
     }
@@ -73,7 +76,7 @@ enum XLSXExporter {
     </Relationships>
     """
 
-    static func worksheetXML(trips: [Trip], rate: ReimbursementRate) -> String {
+    static func worksheetXML(trips: [Trip], rate: ReimbursementRate, fixedAmount: Double = 0) -> String {
         var rows: [String] = [headerRow(rate: rate)]
 
         var rowIndex = 2
@@ -85,13 +88,20 @@ enum XLSXExporter {
                 end: trip.endAddress ?? "",
                 miles: Reimbursement.displayedMiles(trip.distanceMiles),
                 classification: trip.classification.displayName,
-                amount: Reimbursement.amount(miles: trip.distanceMiles, rate: rate.perMile)
+                purpose: trip.purpose ?? "",
+                amount: Reimbursement.amount(for: trip, rate: rate)
             ))
+            rowIndex += 1
+        }
+        if fixedAmount > 0 {
+            var cells = inlineStringCell(column: "A", row: rowIndex, value: "Fixed monthly amount (FAVR)")
+            cells += numberCell(column: "G", row: rowIndex, value: fixedAmount)
+            rows.append("<row r=\"\(rowIndex)\">\(cells)</row>")
             rowIndex += 1
         }
 
         let total = ExportFetcher.totalMiles(trips)
-        rows.append(totalRow(rowIndex: rowIndex, total: total, totalAmount: Reimbursement.total(trips, rate: rate.perMile)))
+        rows.append(totalRow(rowIndex: rowIndex, total: total, totalAmount: Reimbursement.total(trips, rate: rate) + fixedAmount))
 
         return """
         <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -111,14 +121,15 @@ enum XLSXExporter {
         return "<row r=\"1\">\(cells)</row>"
     }
 
-    private static func dataRow(rowIndex: Int, date: String, start: String, end: String, miles: Double, classification: String, amount: Double) -> String {
+    private static func dataRow(rowIndex: Int, date: String, start: String, end: String, miles: Double, classification: String, purpose: String, amount: Double) -> String {
         var cells = ""
         cells += inlineStringCell(column: "A", row: rowIndex, value: date)
         cells += inlineStringCell(column: "B", row: rowIndex, value: start)
         cells += inlineStringCell(column: "C", row: rowIndex, value: end)
         cells += numberCell(column: "D", row: rowIndex, value: miles, decimals: 1)
         cells += inlineStringCell(column: "E", row: rowIndex, value: classification)
-        cells += numberCell(column: "F", row: rowIndex, value: amount)
+        cells += inlineStringCell(column: "F", row: rowIndex, value: purpose)
+        cells += numberCell(column: "G", row: rowIndex, value: amount)
         return "<row r=\"\(rowIndex)\">\(cells)</row>"
     }
 
@@ -126,7 +137,7 @@ enum XLSXExporter {
         var cells = ""
         cells += inlineStringCell(column: "A", row: rowIndex, value: "Total")
         cells += numberCell(column: "D", row: rowIndex, value: total, decimals: 1)
-        cells += numberCell(column: "F", row: rowIndex, value: totalAmount)
+        cells += numberCell(column: "G", row: rowIndex, value: totalAmount)
         return "<row r=\"\(rowIndex)\">\(cells)</row>"
     }
 

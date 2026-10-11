@@ -7,12 +7,23 @@ struct TripListView: View {
     @Environment(\.modelContext) private var modelContext
     @State private var showingExport = false
     @State private var showingSettings = false
+    @State private var showingAddTrip = false
     @State private var confirmingFinish = false
     @Environment(AppSession.self) private var appSession
+    @Environment(SubscriptionManager.self) private var subscriptions: SubscriptionManager?
 
     var body: some View {
         NavigationStack {
             List {
+                if subscriptions?.state == .expired {
+                    Section {
+                        NavigationLink {
+                            SubscriptionView()
+                        } label: {
+                            Label("Your free period has ended. Subscribe to keep recording drives.", systemImage: "exclamationmark.circle")
+                        }
+                    }
+                }
                 ForEach(monthSections, id: \.key) { section in
                     Section(section.title) {
                         ForEach(section.trips) { trip in
@@ -53,6 +64,13 @@ struct TripListView: View {
                 }
                 ToolbarItem(placement: .primaryAction) {
                     Button {
+                        showingAddTrip = true
+                    } label: {
+                        Label("Add Trip", systemImage: "plus")
+                    }
+                }
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
                         showingExport = true
                     } label: {
                         Label("Export", systemImage: "square.and.arrow.up")
@@ -68,6 +86,9 @@ struct TripListView: View {
             .sheet(isPresented: $showingExport) {
                 ExportView(trips: trips)
             }
+            .sheet(isPresented: $showingAddTrip) {
+                ManualTripView()
+            }
             .sheet(isPresented: $showingSettings) {
                 SettingsView()
             }
@@ -76,7 +97,7 @@ struct TripListView: View {
                     ContentUnavailableView(
                         "No Trips Yet",
                         systemImage: "car",
-                        description: Text("Drives you take will show up here automatically.")
+                        description: Text("Drives you take will show up here automatically. Tap + to add one yourself.")
                     )
                 }
             }

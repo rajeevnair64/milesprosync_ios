@@ -59,3 +59,43 @@ struct ExportFilterTests {
         #expect(ExportFetcher.totalMiles(result) == 8)
     }
 }
+
+struct ExportPeriodTests {
+    private func trip(_ y: Int, _ m: Int, _ d: Int, hour: Int = 12) -> Trip {
+        let date = Calendar.current.date(from: DateComponents(year: y, month: m, day: d, hour: hour))!
+        return Trip(
+            startDate: date, endDate: date.addingTimeInterval(600), distanceMiles: 5,
+            startLatitude: 0, startLongitude: 0, endLatitude: 0, endLongitude: 0
+        )
+    }
+
+    @Test func yearMatchesWholeYear() {
+        let filter = ExportFilter(year: 2026)
+        #expect(filter.matches(trip(2026, 1, 1)))
+        #expect(filter.matches(trip(2026, 12, 31)))
+        #expect(!filter.matches(trip(2025, 12, 31)))
+        #expect(!filter.matches(trip(2027, 1, 1)))
+    }
+
+    @Test func rangeIncludesBothEndDaysWholly() {
+        let start = trip(2026, 3, 10, hour: 15).startDate
+        let end = trip(2026, 3, 20, hour: 9).startDate
+        let filter = ExportFilter(period: .range(start: start, end: end))
+        #expect(filter.matches(trip(2026, 3, 10, hour: 1)))
+        #expect(filter.matches(trip(2026, 3, 20, hour: 23)))
+        #expect(!filter.matches(trip(2026, 3, 9)))
+        #expect(!filter.matches(trip(2026, 3, 21)))
+    }
+
+    @Test func rangeToleratesSwappedDates() {
+        let a = trip(2026, 3, 10).startDate
+        let b = trip(2026, 3, 20).startDate
+        #expect(ExportFilter(period: .range(start: b, end: a)).matches(trip(2026, 3, 15)))
+    }
+
+    @Test func fileNamesDescribeThePeriod() {
+        #expect(ExportNaming.fileBaseName(filter: ExportFilter(year: 2026)) == "MilesProSync-2026-all")
+        #expect(ExportNaming.fileBaseName(filter: ExportFilter(year: 2026, month: 3, classification: .business))
+            == "MilesProSync-2026-03-business")
+    }
+}

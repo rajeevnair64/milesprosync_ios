@@ -1,6 +1,6 @@
-# Miles Pro Sync Privacy Policy
+# MilesProSync Privacy Policy
 
-Effective date: September 29, 2026
+Effective date: October 11, 2026
 
 This policy explains what information MilesProSync (the "app") collects, how it is used, where it is stored, and the choices you have. The app is operated by AisleWeb ("we", "us"). If you have questions, contact us at admin@aisleweb.com.
 
@@ -10,6 +10,8 @@ This policy explains what information MilesProSync (the "app") collects, how it 
 - You do not need an account to use the app. Your trips and settings are stored on your device.
 - Website Sync is optional. Only if you turn it on by signing in with Apple are your trips (including their GPS routes) uploaded to our cloud database, so you can view them on the MilesProSync website.
 - When you delete a trip, it is hidden from you but kept as a record on your device and in our cloud database.
+- Subscriptions are bought through Apple's in-app purchase. New users get two free months; after that the app needs a subscription to record new drives.
+- Teams are optional. If you join one, only your **Business** trips that end while you are a member are shown to the team. Personal and unclassified trips are never shown to it.
 - We do not sell your data, show ads, use third-party analytics, or track you across other companies' apps and websites.
 
 ## Information we collect
@@ -64,12 +66,30 @@ The website uses only these cookies, all needed for it to work. There are no adv
 
 Route drawings on the website are made in your browser from your own trip data; no map service receives your trip locations.
 
+### Subscriptions
+
+Subscriptions are bought and managed through Apple (in-app purchase), and Apple handles your payment details; we never receive your card or payment information. The app keeps the date you first used it (in the iOS Keychain, so reinstalling doesn't restart the two free months) and the expiry date of your current subscription, on your device, to decide whether new drives can be recorded.
+
+If you subscribe to a Team plan, the app also sends Apple's signed receipt for that subscription to our server, together with your account, so the server can confirm the subscription is active. We store the product, the expiry date, and the original transaction identifier.
+
+### Teams (optional)
+
+You can join a team with an invite code from the team's admin. Joining needs Website Sync and a Team subscription. While you are on a team:
+
+- The team's admins and managers can see, on the website, your **Business** trips that ended after you joined and before you left: dates, start and end addresses, distances and reimbursement amounts. They cannot see Personal or Unclassified trips, deleted trips, your notes, or anything before you joined or after you left. Your GPS routes are not shown to the team.
+- Your team's membership record keeps your role, the dates you joined and left, and your email address (or Apple's private relay address) so the team can identify you.
+- Each month you can submit a report. Managers can approve or reject it with a comment. An approved report keeps a fixed snapshot of the number of trips, miles, and amount, and a log of team actions (joins, role changes, rate changes and approvals) is kept for the team's records.
+- You can leave a team at any time in the app (Settings → Team → Leave Team), which ends the team's access to your trips immediately. Deleting your website account also removes you from the team.
+
+Team records (membership, reports and the activity log) are kept for four years from the date they were created, like trip records, and then erased.
+
 ## How we use information
 
 We use the information above only to provide the app's features:
 
 - detecting drives and recording trips
 - calculating mileage and reimbursement amounts
+- checking your subscription, and, if you join a team, showing your Business trips to the team and handling the team's reports
 - showing your trips and producing the CSV, PDF, and Excel exports you request
 - if you turn on Website Sync: signing you in, and uploading your trips so you can view them on the website
 - keeping a complete record of trips, including trips you have deleted (see "Deleted trips")
@@ -85,6 +105,7 @@ When you delete a trip, it is removed from your trip list and from exports, and 
 We do not sell or rent your information, and we do not share it with third parties for their own purposes. The app relies on these service providers:
 
 - **Apple (address lookup).** When a trip ends, the app sends its start and end coordinates to Apple's geocoding service to look up street addresses. Apple's handling of this data is described in Apple's privacy policy.
+- **Apple (in-app purchase).** Apple processes your subscription payment and tells the app which subscription is active. Apple's handling of this is described in Apple's privacy policy.
 - **Apple (Sign in with Apple, only if you turn on Website Sync).** Apple authenticates you and tells us your Apple ID identifier and, if you share it, your email address. Apple's handling of this is described in Apple's privacy policy.
 - **jsDelivr (website only).** The website loads its Bootstrap code and style files from jsDelivr, a public content delivery network, which receives your IP address and browser information when delivering them.
 - **DigitalOcean (Website Sync, only if you turn it on).** Our website server and database, which hold your account and trip records, are hosted by DigitalOcean in the eastern United States. DigitalOcean processes this data on our behalf.
@@ -117,6 +138,7 @@ We keep trip records for **four years from the date of each trip** for tax and a
 - **Stopping Sign in with Apple:** you can stop using Sign in with Apple for the app in iOS Settings → your name → Sign-In & Security → Sign in with Apple. The app then turns off Website Sync.
 - **Access and copies:** you can export your trips at any time from the app.
 - **Correction:** you can change a trip's classification in the app.
+- **Leaving a team:** Settings → Team → Leave Team ends a team's access to your trips right away.
 - **Account deletion:** you can delete your website account in the app under Settings → Website Sync → Delete Website Account, or on the website's Account page. This removes your cloud login and email address immediately and turns off Website Sync; uploaded trip records are kept until four years after each trip's date, as described in "Retention", then erased. You can also contact us at admin@aisleweb.com.
 - Depending on where you live (for example, the European Economic Area, the United Kingdom, or California), you may have additional rights, such as to access, correct, delete, or port your personal information, or to object to or restrict certain processing. To exercise them, contact us at admin@aisleweb.com. We will respond within the time required by applicable law.
 

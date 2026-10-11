@@ -142,6 +142,14 @@ actor GeocodingService {
         return AddressCandidate(parts: AddressParts(placemark), location: placemark.location)
     }
 
+    /// Forward geocoding: the coordinate for a typed address, or nil when it can't be found.
+    static func coordinate(for address: String) async -> CLLocationCoordinate2D? {
+        let geocoder = CLGeocoder()
+        guard let placemark = try? await geocoder.geocodeAddressString(address).first,
+              let location = placemark.location else { return nil }
+        return location.coordinate
+    }
+
     private func cacheKey(latitude: Double, longitude: Double) -> String {
         // Round to ~11m precision so nearby points (e.g. two points outside the same
         // building) share a cache entry.

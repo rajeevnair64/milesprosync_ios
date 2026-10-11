@@ -12,7 +12,7 @@ struct CSVExporterTests {
 
         let csv = CSVExporter.makeCSV(trips: [trip], rate: ReimbursementRate(perMile: 0.725))
 
-        #expect(csv.contains("Date,Start,End,Miles,Classification,Reimbursement ($0.725/mi)"))
+        #expect(csv.contains("Date,Start,End,Miles,Classification,Purpose,Reimbursement ($0.725/mi)"))
         #expect(csv.contains("123 Main St"))
         #expect(csv.contains("456 Oak Ave"))
         #expect(csv.contains("12.3"))
@@ -59,8 +59,8 @@ struct CSVExporterTests {
         let lines = CSVExporter.makeCSV(trips: [trip, other], rate: ReimbursementRate(perMile: 0.5)).components(separatedBy: "\r\n")
 
         #expect(lines[0].hasSuffix("Reimbursement ($0.50/mi)"))
-        #expect(lines[1].hasSuffix(",10.0,Business,5.00"))
-        #expect(lines[2].hasSuffix(",4.0,Business,2.00"))
-        #expect(lines.last == "Total,,,14.0,,7.00")
+        #expect(lines[1].hasSuffix(",10.0,Business,,5.00"))
+        #expect(lines[2].hasSuffix(",4.0,Business,,2.00"))
+        #expect(lines.last == "Total,,,14.0,,,7.00")
     }
 }

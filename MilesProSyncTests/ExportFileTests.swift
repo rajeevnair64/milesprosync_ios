@@ -46,7 +46,7 @@ struct ExportFileTests {
     @Test func xlsxMilesMatchReimbursementColumn() {
         let xml = XLSXExporter.worksheetXML(trips: [trip(miles: 7.15, start: "A", end: "B")], rate: rate)
         #expect(xml.contains("<c r=\"D2\"><v>7.2</v></c>")) // 7.2 × 0.725 = 5.22
-        #expect(xml.contains("<c r=\"F2\"><v>5.22</v></c>"))
+        #expect(xml.contains("<c r=\"G2\"><v>5.22</v></c>"))
         #expect(xml.contains("Reimbursement ($0.725/mi)"))
     }
 }

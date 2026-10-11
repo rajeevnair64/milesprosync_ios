@@ -4,21 +4,47 @@ struct ExportView: View {
     let trips: [Trip]
 
     @Environment(\.dismiss) private var dismiss
+    private enum PeriodKind: String, CaseIterable, Identifiable {
+        case month = "Month", year = "Year", custom = "Custom"
+        var id: String { rawValue }
+    }
+
+    @State private var periodKind: PeriodKind = .month
     @State private var selectedMonth = Date()
+    @State private var selectedYear = Calendar.current.component(.year, from: .now)
+    @State private var rangeStart = Calendar.current.date(byAdding: .month, value: -1, to: .now) ?? .now
+    @State private var rangeEnd = Date()
     @State private var classification: TripClassification?
     @State private var format: ExportFormat = .csv
     @State private var exportURL: URL?
     @State private var errorMessage: String?
     @AppStorage(AppSettings.Key.mileageRate) private var mileageRate = AppSettings.defaultMileageRate
     @AppStorage(AppSettings.Key.countryCode) private var countryCode = AppSettings.defaultCountryCode
+    @AppStorage(AppSettings.Key.rateMode) private var rateMode = AppSettings.RateMode.irs.rawValue
+    @AppStorage(AppSettings.Key.favrFixedMonthly) private var favrFixedMonthly = 0.0
+    @AppStorage(AppSettings.Key.favrPerMile) private var favrPerMile = 0.0
+    @AppStorage(AppSettings.Key.favrMinMonthlyMiles) private var favrMinMonthlyMiles = 0.0
 
     var body: some View {
         NavigationStack {
             Form {
-                Section("Month") {
-                    DatePicker("Month", selection: $selectedMonth, displayedComponents: .date)
-                        .datePickerStyle(.compact)
-                        .labelsHidden()
+                Section("Period") {
+                    Picker("Period", selection: $periodKind) {
+                        ForEach(PeriodKind.allCases) { Text($0.rawValue).tag($0) }
+                    }
+                    .pickerStyle(.segmented)
+                    switch periodKind {
+                    case .month:
+                        DatePicker("Month", selection: $selectedMonth, displayedComponents: .date)
+                            .datePickerStyle(.compact)
+                    case .year:
+                        Picker("Year", selection: $selectedYear) {
+                            ForEach(availableYears, id: \.self) { Text(String($0)).tag($0) }
+                        }
+                    case .custom:
+                        DatePicker("From", selection: $rangeStart, displayedComponents: .date)
+                        DatePicker("To", selection: $rangeEnd, displayedComponents: .date)
+                    }
                 }
                 Section("Trip type") {
                     Picker("Trip type", selection: $classification) {
@@ -40,8 +66,12 @@ struct ExportView: View {
                 Section {
                     Text("\(matchingTrips.count) trip(s), \(Formatters.miles(totalMiles)) total")
                         .foregroundStyle(.secondary)
-                    Text("Reimbursement: \(rate.format(totalReimbursement)) at \(rate.label)")
+                    Text("Reimbursement: \(rate.format(totalReimbursement + fixedAmount)) at \(rate.label)")
                         .foregroundStyle(.secondary)
+                    if fixedAmount > 0 {
+                        Text("Includes \(rate.format(fixedAmount)) fixed monthly amount")
+                            .foregroundStyle(.secondary)
+                    }
                 }
                 if let errorMessage {
                     Section {
@@ -64,14 +94,33 @@ struct ExportView: View {
                     }
                 }
             }
+            .onChange(of: periodKind) { exportURL = nil }
             .onChange(of: selectedMonth) { exportURL = nil }
+            .onChange(of: selectedYear) { exportURL = nil }
+            .onChange(of: rangeStart) { exportURL = nil }
+            .onChange(of: rangeEnd) { exportURL = nil }
             .onChange(of: classification) { exportURL = nil }
             .onChange(of: format) { exportURL = nil }
         }
     }
 
     private var filter: ExportFilter {
-        ExportFilter(monthContaining: selectedMonth, classification: classification)
+        switch periodKind {
+        case .month:
+            ExportFilter(monthContaining: selectedMonth, classification: classification)
+        case .year:
+            ExportFilter(year: selectedYear, classification: classification)
+        case .custom:
+            ExportFilter(period: .range(start: rangeStart, end: rangeEnd), classification: classification)
+        }
+    }
+
+    /// Years that have trips, plus this one.
+    private var availableYears: [Int] {
+        let calendar = Calendar.current
+        let years = Set(trips.map { calendar.component(.year, from: $0.startDate) })
+            .union([calendar.component(.year, from: .now), selectedYear])
+        return years.sorted(by: >)
     }
 
     private var matchingTrips: [Trip] {
@@ -83,11 +132,20 @@ struct ExportView: View {
     }
 
     private var rate: ReimbursementRate {
-        AppSettings.reimbursementRate(perMile: mileageRate, countryCode: countryCode)
+        AppSettings.reimbursementRate(
+            mode: AppSettings.RateMode(rawValue: rateMode) ?? .irs,
+            customPerMile: mileageRate,
+            favrFixedMonthly: favrFixedMonthly, favrPerMile: favrPerMile, favrMinMonthlyMiles: favrMinMonthlyMiles,
+            countryCode: countryCode, at: filter.referenceDate()
+        )
     }
 
     private var totalReimbursement: Double {
-        Reimbursement.total(matchingTrips, rate: rate.perMile)
+        Reimbursement.total(matchingTrips, rate: rate)
+    }
+
+    private var fixedAmount: Double {
+        Reimbursement.fixedAmount(trips: matchingTrips, filter: filter, rate: rate)
     }
 
     private func generate() {

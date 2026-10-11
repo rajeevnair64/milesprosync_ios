@@ -16,6 +16,8 @@ final class DriveDetectionService {
     var phase: DriveStateMachine.Phase { machine.phase }
     /// Called once a finished trip is fully saved, addresses included (e.g. to upload it).
     @ObservationIgnored var onTripFinished: (@MainActor () -> Void)?
+    /// Asked before a trip begins; false (free period over, no subscription) records nothing new.
+    @ObservationIgnored var isRecordingAllowed: @MainActor () -> Bool = { true }
 
     private let locationManager: any LocationManaging
     private let motionActivityManager = CMMotionActivityManager()
@@ -346,7 +348,7 @@ final class DriveDetectionService {
                 beginIdleMonitoring()
 
             case .beginTrip(let points):
-                guard let first = points.first else { continue }
+                guard let first = points.first, isRecordingAllowed() else { continue }
                 let tripID = await recorder.beginTrip(at: first)
                 for point in points.dropFirst() {
                     await recorder.appendPoint(point, to: tripID)
