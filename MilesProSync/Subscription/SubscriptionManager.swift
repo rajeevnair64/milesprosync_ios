@@ -10,6 +10,8 @@ import StoreKit
 final class SubscriptionManager {
     private(set) var products: [Product] = []
     private(set) var state: AccessState
+    /// Individual or Teams; nil until the person chooses (or pays, which decides it).
+    private(set) var accountType: AccountType?
     private(set) var isWorking = false
     private(set) var errorMessage: String?
     /// The signed Team transaction currently in force, for the website (nil without a Team plan).
@@ -20,7 +22,9 @@ final class SubscriptionManager {
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
-        state = AccessStore.state(defaults: defaults)
+        let initial = AccessStore.state(defaults: defaults)
+        state = initial
+        accountType = AccountType.resolve(stored: AccessStore.storedAccountType(defaults: defaults), state: initial)
         updatesTask = Task { [weak self] in
             for await update in Transaction.updates {
                 await self?.handle(update)
@@ -60,9 +64,26 @@ final class SubscriptionManager {
         }
     }
 
+    /// Chooses Individual or Teams. Refused once a plan is paid for, which decides it.
+    @discardableResult
+    func chooseAccountType(_ type: AccountType) -> Bool {
+        guard AccountType.canChange(in: state) else { return false }
+        AccessStore.saveAccountType(type, defaults: defaults)
+        accountType = type
+        return true
+    }
+
     func purchase(_ product: Product) async {
-        isWorking = true
         errorMessage = nil
+        // One or the other: a person on Teams buys per-user plans only, an individual the rest.
+        // Buying before choosing chooses.
+        if let accountType, !accountType.allows(productID: product.id) {
+            errorMessage = accountType == .team
+                ? "You're set up as Teams. Per-user team plans are the only plans for a team."
+                : "You're set up as Individual. Team plans are for teams: switch to Teams first."
+            return
+        }
+        isWorking = true
         defer { isWorking = false }
         do {
             switch try await product.purchase() {
@@ -127,6 +148,12 @@ final class SubscriptionManager {
         )
         teamTransaction = plan == .team ? best?.jws : nil
         state = AccessStore.state(defaults: defaults)
+        // What was paid for decides the type, and is remembered if the plan later lapses.
+        let resolved = AccountType.resolve(stored: AccessStore.storedAccountType(defaults: defaults), state: state)
+        if resolved != AccessStore.storedAccountType(defaults: defaults) {
+            AccessStore.saveAccountType(resolved, defaults: defaults)
+        }
+        accountType = resolved
     }
 
     private func handle(_ result: VerificationResult<Transaction>) async {

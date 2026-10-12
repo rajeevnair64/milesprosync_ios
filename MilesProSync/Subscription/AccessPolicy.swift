@@ -65,6 +65,47 @@ enum Plan: String, Equatable, Sendable {
     }
 }
 
+/// What the person uses the app as: one person paying for themselves, or a member of a team.
+/// Never both. What they have paid for decides it; before they pay it is their own choice.
+enum AccountType: String, CaseIterable, Equatable, Sendable {
+    case individual
+    case team
+
+    var displayName: String {
+        switch self {
+        case .individual: "Individual"
+        case .team: "Teams"
+        }
+    }
+
+    /// The type a payment implies (a team plan means Teams; another plan or a pay-once purchase
+    /// means Individual), otherwise the stored choice, which may be nil (not chosen yet).
+    static func resolve(stored: AccountType?, state: AccessState) -> AccountType? {
+        switch state {
+        case .subscribed(let plan?): plan == .team ? .team : .individual
+        case .purchased: .individual
+        case .subscribed(nil), .trial, .expired: stored
+        }
+    }
+
+    /// Whether this type may buy `productID`: Individual has the monthly, yearly and pay-once
+    /// products; Teams has the per-user products.
+    func allows(productID: String) -> Bool {
+        switch self {
+        case .individual: ProductID.store.contains(productID) && !ProductID.teamPlans.contains(productID)
+        case .team: ProductID.teamPlans.contains(productID)
+        }
+    }
+
+    /// The type can be changed only while nothing is paid for; a paid plan pins it.
+    static func canChange(in state: AccessState) -> Bool {
+        switch state {
+        case .trial, .expired: true
+        case .subscribed, .purchased: false
+        }
+    }
+}
+
 enum AccessState: Equatable, Sendable {
     /// The free period for a new user: every feature, two months from first launch.
     case trial(endsAt: Date)
@@ -142,6 +183,16 @@ enum AccessStore {
     static let productKey = "access.product"
     static let purchasedAtKey = "access.purchasedAt"
     static let featuresThroughKey = "access.featuresThrough"
+    static let accountTypeKey = "access.accountType"
+    static let accountTypePromptedKey = "access.accountTypePrompted"
+
+    static func storedAccountType(defaults: UserDefaults = .standard) -> AccountType? {
+        defaults.string(forKey: accountTypeKey).flatMap(AccountType.init(rawValue:))
+    }
+
+    static func saveAccountType(_ type: AccountType?, defaults: UserDefaults = .standard) {
+        defaults.set(type?.rawValue, forKey: accountTypeKey)
+    }
 
     /// The first-launch date, recorded now if this is the first time anyone asked.
     static func trialStart(now: Date = .now, item: KeychainItem = trialItem) -> Date {

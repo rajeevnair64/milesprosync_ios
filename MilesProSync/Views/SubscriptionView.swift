@@ -50,10 +50,6 @@ struct SubscriptionView: View {
                     }
                 }
 
-                Section {
-                    NavigationLink("Using this for a team? See team plans") { TeamPlansView() }
-                }
-
                 if let message = subscriptions.errorMessage {
                     Section { Text(message).foregroundStyle(.red) }
                 }
@@ -163,8 +159,8 @@ private struct PlanRow: View {
     }
 }
 
-/// Team plans, one tap away so people buying for themselves aren't shown them.
-private struct TeamPlansView: View {
+/// The per-user team plans: all a Teams account is offered.
+struct TeamPlansView: View {
     @Environment(SubscriptionManager.self) private var subscriptions: SubscriptionManager?
 
     var body: some View {

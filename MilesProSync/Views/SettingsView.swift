@@ -4,6 +4,7 @@ import SwiftUI
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @AppStorage(AppSettings.Key.countryCode) private var countryCode = AppSettings.defaultCountryCode
+    @Environment(SubscriptionManager.self) private var subscriptions: SubscriptionManager?
     @State private var showingWebsiteSetup = false
 
     var body: some View {
@@ -18,16 +19,28 @@ struct SettingsView: View {
                 }
                 ReimbursementSection()
                 Section {
-                    NavigationLink("Subscription") {
-                        SubscriptionView()
+                    switch subscriptions?.accountType {
+                    case .individual:
+                        NavigationLink("Subscription") { SubscriptionView() }
+                    case .team:
+                        NavigationLink("Team") { TeamView() }
+                    case nil:
+                        EmptyView()
                     }
-                    NavigationLink("Team") {
-                        TeamView()
+                    NavigationLink(subscriptions?.accountType.map { "Using as \($0.displayName)" } ?? "Choose Individual or Teams") {
+                        AccountTypeView()
                     }
                 } header: {
                     Text("Plan")
                 } footer: {
-                    Text("Two months free, then $39.99 per year, $4.99 per month, or $109.99 once for 5 years (one person only). Teams: $3.99 per user per month or $34.99 per year.")
+                    switch subscriptions?.accountType {
+                    case .individual:
+                        Text("Two months free, then $39.99 per year, $4.99 per month, or $109.99 once for 5 years (one person only).")
+                    case .team:
+                        Text("Two months free, then $3.99 per user per month or $34.99 per user per year.")
+                    case nil:
+                        Text("Choose how you use Miles Pro Sync: on your own, or as part of a team.")
+                    }
                 }
                 Section {
                     NavigationLink("Auto-Classification") {

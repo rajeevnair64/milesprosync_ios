@@ -5,6 +5,8 @@ import SwiftUI
 struct RootView: View {
     @Environment(AppSession.self) private var appSession
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(SubscriptionManager.self) private var subscriptions: SubscriptionManager?
+    @State private var choosingAccountType = false
 
     var body: some View {
         Group {
@@ -25,6 +27,24 @@ struct RootView: View {
         }
         .onChange(of: scenePhase) {
             appSession.scenePhaseChanged(to: scenePhase)
+        }
+        // Once, until a choice is made: Individual or Teams. Dismissing it leaves the choice to
+        // Settings → Plan.
+        .task {
+            let defaults = UserDefaults.standard
+            guard subscriptions?.accountType == nil, !defaults.bool(forKey: AccessStore.accountTypePromptedKey) else { return }
+            defaults.set(true, forKey: AccessStore.accountTypePromptedKey)
+            choosingAccountType = true
+        }
+        .sheet(isPresented: $choosingAccountType) {
+            NavigationStack {
+                AccountTypeView()
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("Later") { choosingAccountType = false }
+                        }
+                    }
+            }
         }
     }
 }
