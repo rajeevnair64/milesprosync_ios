@@ -39,6 +39,12 @@ struct TripListView: View {
                             }
                             // A trip still being recorded can't be deleted until it finishes.
                             .deleteDisabled(trip.isInProgress)
+                            // Soft pale yellow highlights the live recording.
+                            .listRowBackground(
+                                trip.isInProgress
+                                    ? Color(red: 1.0, green: 0.93, blue: 0.55).opacity(0.55)
+                                    : nil
+                            )
                             .swipeActions(edge: .leading) {
                                 if trip.isInProgress {
                                     Button {

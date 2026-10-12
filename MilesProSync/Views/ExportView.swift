@@ -14,7 +14,7 @@ struct ExportView: View {
     @State private var selectedYear = Calendar.current.component(.year, from: .now)
     @State private var rangeStart = Calendar.current.date(byAdding: .month, value: -1, to: .now) ?? .now
     @State private var rangeEnd = Date()
-    @State private var classification: TripClassification?
+    @State private var classification: TripClassification? = .business
     @State private var format: ExportFormat = .csv
     @State private var exportURL: URL?
     @State private var errorMessage: String?
