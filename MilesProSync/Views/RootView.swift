@@ -26,6 +26,7 @@ struct RootView: View {
                 )
             }
         }
+        .tint(AppTheme.blue)
         .onChange(of: scenePhase) {
             appSession.scenePhaseChanged(to: scenePhase)
         }

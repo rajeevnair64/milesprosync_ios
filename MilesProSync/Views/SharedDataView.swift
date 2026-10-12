@@ -10,6 +10,7 @@ struct SharedDataView: View {
                 NavigationLink("Privacy Policy") { PrivacyPolicyView() }
             }
         }
+        .brandedBackground()
         .navigationTitle("What's Shared")
         .navigationBarTitleDisplayMode(.inline)
     }

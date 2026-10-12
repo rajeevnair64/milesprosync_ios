@@ -15,6 +15,13 @@ struct TripListView: View {
     var body: some View {
         NavigationStack {
             List {
+                if !trips.isEmpty {
+                    Section {
+                        monthlySummary
+                            .listRowInsets(EdgeInsets())
+                            .listRowBackground(Color.clear)
+                    }
+                }
                 if subscriptions?.state == .expired {
                     Section {
                         NavigationLink {
@@ -39,7 +46,7 @@ struct TripListView: View {
                                     } label: {
                                         Label("Finish", systemImage: "flag.checkered")
                                     }
-                                    .tint(.green)
+                                    .tint(AppTheme.teal)
                                 }
                             }
                         }
@@ -50,6 +57,7 @@ struct TripListView: View {
                 }
             }
             .listStyle(.insetGrouped)
+            .brandedBackground()
             .navigationTitle("Trips")
             .navigationDestination(for: Trip.self) { trip in
                 TripDetailView(trip: trip)
@@ -94,14 +102,42 @@ struct TripListView: View {
             }
             .overlay {
                 if trips.isEmpty {
-                    ContentUnavailableView(
-                        "No Trips Yet",
-                        systemImage: "car",
-                        description: Text("Drives you take will show up here automatically. Tap + to add one yourself.")
-                    )
+                    ContentUnavailableView {
+                        Label("Your next drive starts here", systemImage: "car.side.hill.up.fill")
+                            .foregroundStyle(AppTheme.blue)
+                    } description: {
+                        Text("Trips appear automatically as you drive. You can also add one yourself.")
+                    } actions: {
+                        Button("Add Your First Trip", systemImage: "plus") { showingAddTrip = true }
+                            .buttonStyle(.borderedProminent)
+                    }
                 }
             }
         }
+    }
+
+    private var monthlySummary: some View {
+        let calendar = Calendar.current
+        let completed = trips.filter {
+            !$0.isInProgress && calendar.isDate($0.startDate, equalTo: .now, toGranularity: .month)
+        }
+        return VStack(alignment: .leading, spacing: 12) {
+            Label("THIS MONTH", systemImage: "road.lanes")
+                .font(.caption.weight(.semibold))
+            Text(Formatters.miles(completed.reduce(0) { $0 + $1.distanceMiles }))
+                .font(.largeTitle.bold().monospacedDigit())
+            Text("\(completed.count) completed trips")
+                .font(.subheadline)
+            if trips.contains(where: \.isInProgress) {
+                Label("Recording your drive", systemImage: "record.circle")
+                    .font(.subheadline.weight(.semibold))
+            }
+        }
+        .foregroundStyle(.white)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(20)
+        .background(AppTheme.summaryGradient, in: RoundedRectangle(cornerRadius: 20))
+        .accessibilityElement(children: .combine)
     }
 
     private func delete(_ trips: [Trip]) {

@@ -175,6 +175,7 @@ struct WebsiteSyncSetupView: View {
                     Text("By signing in, you agree to upload the information above. You can turn website sync off at any time in Settings.")
                 }
             }
+            .brandedBackground()
             .navigationTitle("Website Access")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

@@ -64,6 +64,7 @@ struct SubscriptionView: View {
                 Text("Subscriptions aren't available right now.")
             }
         }
+        .brandedBackground()
         .navigationTitle("Subscription")
         .navigationBarTitleDisplayMode(.inline)
         .task { await subscriptions?.loadProducts() }
@@ -178,6 +179,7 @@ struct TeamPlansView: View {
                 Text("For people on a team. Unlimited trips, team reports and approvals. Only your Business trips are ever shared with a team. Subscriptions renew each month or year until cancelled at least 24 hours before the end of the current period; manage or cancel in your Apple ID account settings.")
             }
         }
+        .brandedBackground()
         .navigationTitle("Team plans")
         .navigationBarTitleDisplayMode(.inline)
         .task { await subscriptions?.loadProducts() }

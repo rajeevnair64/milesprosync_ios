@@ -104,6 +104,9 @@ struct SyncLifecycleTests {
             if request.url?.path() == "/api/v1/auth/apple" { await gate.wait() }
         }
         await signedOut.server.enqueue(200, SyncFixtures.tokenResponse(access: "access-new", refresh: "refresh-new"))
+        // If the response reaches the client before its queued sign-out, the new token
+        // is immediately revoked. Both orderings must leave sync off.
+        await signedOut.server.enqueue(204, "")
         let service = signedOut.service
 
         let connect = Task { @MainActor in

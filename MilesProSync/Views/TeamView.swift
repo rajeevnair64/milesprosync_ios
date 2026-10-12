@@ -23,6 +23,7 @@ struct TeamView: View {
                 content
             }
         }
+        .brandedBackground()
         .navigationTitle("Team")
         .navigationBarTitleDisplayMode(.inline)
         .task(id: subscriptions?.teamTransaction) { await refresh() }

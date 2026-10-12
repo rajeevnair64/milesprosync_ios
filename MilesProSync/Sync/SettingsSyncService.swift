@@ -137,22 +137,22 @@ final class SettingsSyncService {
             if base == nil {
                 // Never matched with this account.
                 if let remote = try await client.fetchSettings() {
-                    finish(.pulled(remote), passEpoch)
+                    finish(.pulled(remote), passEpoch, startedWith: current)
                 } else {
                     status = .syncing
-                    finish(.pushed(try await client.saveSettings(current, baseUpdatedAt: nil)), passEpoch)
+                    finish(.pushed(try await client.saveSettings(current, baseUpdatedAt: nil)), passEpoch, startedWith: current)
                 }
             } else if current != lastMatched {
                 status = .syncing
                 do {
-                    finish(.pushed(try await client.saveSettings(current, baseUpdatedAt: base)), passEpoch)
+                    finish(.pushed(try await client.saveSettings(current, baseUpdatedAt: base)), passEpoch, startedWith: current)
                 } catch SyncError.server(status: 409, _) {
                     // Another device saved after this one last synced: theirs wins.
-                    if let remote = try await client.fetchSettings() { finish(.pushed(remote), passEpoch) }
+                    if let remote = try await client.fetchSettings() { finish(.pushed(remote), passEpoch, startedWith: current) }
                 }
             } else if lastPull.map({ now().timeIntervalSince($0) >= Self.pullInterval }) ?? true {
-                if let remote = try await client.fetchSettings(), remote.updatedAt != base {
-                    finish(.pulled(remote), passEpoch)
+                if let remote = try await client.fetchSettings() {
+                    finish(.pulled(remote), passEpoch, startedWith: current)
                 } else {
                     lastPull = now()
                 }
@@ -174,17 +174,26 @@ final class SettingsSyncService {
         }
     }
 
-    /// Remembers the server's copy as matched and makes this device equal to it. Writing the
-    /// device's settings too (even after an upload) keeps values the server rounded in step, so
-    /// they are not uploaded again.
-    private func finish(_ outcome: Outcome, _ passEpoch: Int) {
+    /// Remembers the server's copy, applying rounded values only if the user has not edited
+    /// settings during the request. Newer local edits are uploaded against the new server time.
+    private func finish(_ outcome: Outcome, _ passEpoch: Int, startedWith snapshot: SettingsPayload) {
         guard passEpoch == epoch, isSignedIn() else { return }
         let record = outcome.record
-        guard let data = try? JSONEncoder().encode(record.settings),
-              record.settings.apply(to: defaults) else { return }
+        guard AppSettings.RateMode(rawValue: record.settings.rateMode) != nil,
+              let data = try? JSONEncoder().encode(record.settings) else { return }
+        let latest = SettingsPayload(defaults: defaults)
+        let editedDuringRequest = latest != snapshot
+        if !editedDuringRequest {
+            guard record.settings.apply(to: defaults) else { return }
+        }
         defaults.set(record.updatedAt, forKey: Self.baseKey)
         defaults.set(data, forKey: Self.payloadKey)
         lastPull = now()
+        if editedDuringRequest, latest != record.settings {
+            status = .pending
+            needsAnotherPass = true
+            return
+        }
         // A change made here reached the account (also when another device's newer copy was taken
         // instead). A plain download isn't announced.
         if case .pushed = outcome { status = .synced(now()) }

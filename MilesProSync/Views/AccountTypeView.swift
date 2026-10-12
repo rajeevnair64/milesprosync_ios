@@ -29,6 +29,7 @@ struct AccountTypeView: View {
                      : "Your plan decides this. To switch, let your current plan end first.")
             }
         }
+        .brandedBackground()
         .navigationTitle("Plan type")
         .navigationBarTitleDisplayMode(.inline)
     }

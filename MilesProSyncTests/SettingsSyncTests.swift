@@ -260,3 +260,72 @@ struct SettingsSyncTests {
         #expect(service.status == .idle)
     }
 }
+
+
+extension SettingsSyncTests {
+    @Test func editDuringUploadIsPreservedAndUploadedWithNewServerTime() async throws {
+        await server.enqueue(200, Self.record(rate: 0.5))
+        await service.sync()
+        defaults.set(0.6, forKey: AppSettings.Key.mileageRate)
+        let change: @MainActor @Sendable () -> Void = {
+            self.defaults.set(0.7, forKey: AppSettings.Key.mileageRate)
+        }
+        await server.setOnRequest { _ in await change() }
+        await server.enqueue(200, Self.record(rate: 0.6, updatedAt: "version-2"))
+        await server.enqueue(200, Self.record(rate: 0.7, updatedAt: "version-3"))
+
+        await service.sync()
+
+        let puts = await settingsRequests().filter { $0.httpMethod == "PUT" }
+        #expect(puts.count == 2)
+        let latest = try #require(puts.last)
+        #expect(body(latest)["mileage_rate"] as? Double == 0.7)
+        #expect(body(latest)["base_updated_at"] as? String == "version-2")
+        #expect(defaults.double(forKey: AppSettings.Key.mileageRate) == 0.7)
+        #expect(defaults.string(forKey: SettingsSyncService.baseKey) == "version-3")
+        #expect(isSynced)
+    }
+
+    @Test func failedFollowUpUploadKeepsNewerEditForRetry() async throws {
+        await server.enqueue(200, Self.record(rate: 0.5))
+        await service.sync()
+        defaults.set(0.6, forKey: AppSettings.Key.mileageRate)
+        let change: @MainActor @Sendable () -> Void = {
+            self.defaults.set(0.7, forKey: AppSettings.Key.mileageRate)
+        }
+        await server.setOnRequest { _ in await change() }
+        await server.enqueue(200, Self.record(rate: 0.6, updatedAt: "version-2"))
+        await server.enqueue(500)
+
+        await service.sync()
+
+        #expect(defaults.double(forKey: AppSettings.Key.mileageRate) == 0.7)
+        #expect(service.status == .failed)
+        #expect(defaults.string(forKey: SettingsSyncService.baseKey) == "version-2")
+        await server.enqueue(200, Self.record(rate: 0.7, updatedAt: "version-3"))
+        await service.sync()
+        #expect(isSynced)
+        #expect(body(try #require(await settingsRequests().last))["mileage_rate"] as? Double == 0.7)
+    }
+
+    @Test func editDuringInitialDownloadIsPreservedAndUploaded() async throws {
+        defaults.set("custom", forKey: AppSettings.Key.rateMode)
+        defaults.set(0.5, forKey: AppSettings.Key.mileageRate)
+        let change: @MainActor @Sendable () -> Void = {
+            self.defaults.set(0.7, forKey: AppSettings.Key.mileageRate)
+        }
+        await server.setOnRequest { _ in await change() }
+        await server.enqueue(200, Self.record(rate: 0.6, updatedAt: "version-2"))
+        await server.enqueue(200, Self.record(rate: 0.7, updatedAt: "version-3"))
+
+        await service.sync()
+
+        let requests = await settingsRequests()
+        #expect(requests.map(\.httpMethod) == ["GET", "PUT"])
+        let put = try #require(requests.last)
+        #expect(body(put)["base_updated_at"] as? String == "version-2")
+        #expect(body(put)["mileage_rate"] as? Double == 0.7)
+        #expect(defaults.double(forKey: AppSettings.Key.mileageRate) == 0.7)
+        #expect(isSynced)
+    }
+}

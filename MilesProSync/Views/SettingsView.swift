@@ -62,6 +62,7 @@ struct SettingsView: View {
                     LabeledContent("Version", value: AppSettings.versionText())
                 }
             }
+            .brandedBackground()
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
             .sheet(isPresented: $showingWebsiteSetup) {

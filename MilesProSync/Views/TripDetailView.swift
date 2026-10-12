@@ -21,12 +21,12 @@ struct TripDetailView: View {
                 Map(position: $cameraPosition) {
                     if trip.routeCoordinates.count > 1 {
                         MapPolyline(coordinates: trip.routeCoordinates)
-                            .stroke(.blue, style: StrokeStyle(lineWidth: 4, lineCap: .round, lineJoin: .round))
+                            .stroke(AppTheme.blue, style: StrokeStyle(lineWidth: 4, lineCap: .round, lineJoin: .round))
                     }
                     Marker("Start", systemImage: "circle.fill", coordinate: trip.startCoordinate)
-                        .tint(.green)
+                        .tint(AppTheme.teal)
                     Marker("End", systemImage: "mappin", coordinate: trip.endCoordinate)
-                        .tint(.red)
+                        .tint(AppTheme.coral)
                 }
                 .frame(height: 280)
                 .clipShape(RoundedRectangle(cornerRadius: 12))
@@ -99,6 +99,7 @@ struct TripDetailView: View {
             }
             .padding(.vertical)
         }
+        .brandedBackground()
         .navigationTitle("Trip Details")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {

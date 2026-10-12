@@ -1,0 +1,11 @@
+Miles Pro Sync approved icon sources
+
+Created with the built-in ImageGen tool. AppIcon.png is the user's approved
+M-shaped white road on blue with yellow markings and a coral-red car.
+The packaging script resizes the artwork to opaque 1024x1024 PNGs.
+
+Dark appearance prompt:
+Create the dark appearance asset of this exact iPhone app icon. Change ONLY the blue background to a very dark midnight navy gradient (#101C35 top to #050B18 bottom). Preserve exactly the white M-shaped winding road, yellow lane markings, coral-red car, their positions, sizes, details and full square composition. No new objects or text, no pre-rounded corners, opaque full-bleed square.
+
+Tinted appearance prompt:
+Create the monochrome tinted-appearance asset of this exact iPhone app icon. Preserve exactly the M-shaped road, lane markings, car, their geometry, positions and sizes. Background solid black; road white; yellow lane markings become medium gray; coral-red car becomes a medium-dark gray car with near-black windows and lighter gray highlights so it stands out against the white road. Strictly neutral grayscale throughout, no colored pixels. Opaque full-bleed square, no pre-rounded corners, no new objects or text.

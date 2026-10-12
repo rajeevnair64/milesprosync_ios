@@ -79,6 +79,7 @@ struct ExportView: View {
                     }
                 }
             }
+            .brandedBackground()
             .navigationTitle("Export Trips")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {

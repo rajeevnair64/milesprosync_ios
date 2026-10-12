@@ -112,10 +112,10 @@ private struct SyncStatusRow: View {
                 ProgressView()
                 Text("Saving to your account…")
             case .synced(let date):
-                Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+                Image(systemName: "checkmark.circle.fill").foregroundStyle(AppTheme.teal)
                 Text("Saved to your account at \(date.formatted(date: .omitted, time: .shortened))")
             case .failed:
-                Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(AppTheme.gold)
                 Text("Couldn't save yet. It will retry automatically.")
             }
         }

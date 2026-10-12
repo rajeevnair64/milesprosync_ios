@@ -57,6 +57,7 @@ struct AutoClassificationView: View {
                 Text("Trips you classified yourself are never changed.")
             }
         }
+        .brandedBackground()
         .navigationTitle("Auto-Classification")
         .navigationBarTitleDisplayMode(.inline)
         .onChange(of: rules) { rules.save() }
@@ -127,6 +128,7 @@ private struct AddPlaceView: View {
                     Section { Text(errorMessage).foregroundStyle(.red) }
                 }
             }
+            .brandedBackground()
             .navigationTitle("Add Place")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

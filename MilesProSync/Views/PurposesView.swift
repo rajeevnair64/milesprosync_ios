@@ -31,6 +31,7 @@ struct PurposesView: View {
                 }
             }
         }
+        .brandedBackground()
         .navigationTitle("Trip Purposes")
         .navigationBarTitleDisplayMode(.inline)
     }

@@ -72,6 +72,7 @@ struct ManualTripView: View {
                     }
                 }
             }
+            .brandedBackground()
             .navigationTitle(editing == nil ? "Add Trip" : "Edit Trip")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
