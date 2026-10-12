@@ -141,4 +141,122 @@ struct SettingsSyncTests {
             favrFixedMonthly: 0, favrPerMile: 0, favrMinMonthlyMiles: 0
         ))
     }
+
+    // MARK: - Watching for changes
+
+    /// Polls until `condition` holds, up to `seconds`.
+    private func wait(upTo seconds: Double = 6, _ condition: () async -> Bool) async -> Bool {
+        let deadline = Date().addingTimeInterval(seconds)
+        while Date() < deadline {
+            if await condition() { return true }
+            try? await Task.sleep(for: .milliseconds(50))
+        }
+        return await condition()
+    }
+
+    @Test func aSettingChangedOnTheDeviceIsUploadedByItself() async throws {
+        await server.enqueue(200, Self.record(mode: "irs", rate: 0.725))
+        await service.sync()
+        service.start()
+        defer { service.stop() }
+
+        // What the Reimbursement screen does: write the key in this account's defaults.
+        await server.enqueue(200, Self.record(rate: 0.58, updatedAt: "2026-10-11T11:00:00+00:00"))
+        defaults.set("custom", forKey: AppSettings.Key.rateMode)
+        defaults.set(0.58, forKey: AppSettings.Key.mileageRate)
+
+        let uploaded = await wait { await settingsRequests().contains { $0.httpMethod == "PUT" } }
+        #expect(uploaded)
+        let put = try #require(await settingsRequests().first { $0.httpMethod == "PUT" })
+        #expect(body(put)["rate_mode"] as? String == "custom")
+        #expect(body(put)["mileage_rate"] as? Double == 0.58)
+        #expect(body(put)["base_updated_at"] as? String == "2026-10-11T10:00:00+00:00")
+        // A burst of edits went up as one request.
+        #expect(await settingsRequests().filter { $0.httpMethod == "PUT" }.count == 1)
+    }
+
+    @Test func nothingIsUploadedWhileSignedOut() async throws {
+        let client = APIClient(
+            config: SyncFixtures.config, tokenStore: InMemoryTokenStore(SyncFixtures.session()),
+            transport: server.transport
+        )
+        let signedOut = SettingsSyncService(client: client, defaults: defaults, isSignedIn: { false })
+        signedOut.start()
+        defer { signedOut.stop() }
+
+        defaults.set("custom", forKey: AppSettings.Key.rateMode)
+        defaults.set(0.58, forKey: AppSettings.Key.mileageRate)
+        try await Task.sleep(for: .seconds(3))
+
+        #expect(await settingsRequests().isEmpty)
+    }
+
+    // MARK: - Status indicator
+
+    private var isSynced: Bool {
+        if case .synced = service.status { true } else { false }
+    }
+
+    @Test func statusStaysIdleForAPlainDownload() async {
+        await server.enqueue(200, Self.record(mode: "favr", rate: 0.5, favrFixed: 300))
+        await service.sync()
+        #expect(service.status == .idle)
+    }
+
+    @Test func statusShowsSyncedAfterAChangeIsUploaded() async {
+        await server.enqueue(200, Self.record(mode: "irs", rate: 0.725))
+        await service.sync()
+        defaults.set("custom", forKey: AppSettings.Key.rateMode)
+        defaults.set(0.55, forKey: AppSettings.Key.mileageRate)
+        await server.enqueue(200, Self.record(rate: 0.55, updatedAt: "2026-10-11T11:00:00+00:00"))
+
+        await service.sync()
+
+        #expect(isSynced)
+    }
+
+    @Test func statusShowsFailedThenSyncedOnTheRetry() async {
+        await server.enqueue(200, Self.record(mode: "irs", rate: 0.725))
+        await service.sync()
+        defaults.set("custom", forKey: AppSettings.Key.rateMode)
+        defaults.set(0.55, forKey: AppSettings.Key.mileageRate)
+        await server.enqueue(500, #"{"message":"Server error"}"#)
+        await service.sync()
+        #expect(service.status == .failed)
+
+        await server.enqueue(200, Self.record(rate: 0.55, updatedAt: "2026-10-11T11:00:00+00:00"))
+        await service.sync()
+        #expect(isSynced)
+    }
+
+    @Test func statusGoesPendingWhenASettingChangesThenSynced() async throws {
+        await server.enqueue(200, Self.record(mode: "irs", rate: 0.725))
+        await service.sync()
+        service.start()
+        defer { service.stop() }
+
+        await server.enqueue(200, Self.record(rate: 0.58, updatedAt: "2026-10-11T11:00:00+00:00"))
+        defaults.set("custom", forKey: AppSettings.Key.rateMode)
+        defaults.set(0.58, forKey: AppSettings.Key.mileageRate)
+        // The notification is delivered on the next main-queue turn.
+        let pending = await wait(upTo: 1) { service.status == .pending }
+        #expect(pending)
+
+        let synced = await wait { isSynced }
+        #expect(synced)
+    }
+
+    @Test func statusIsClearedOnSignOut() async {
+        await server.enqueue(200, Self.record(mode: "irs", rate: 0.725))
+        await service.sync()
+        defaults.set(0.55, forKey: AppSettings.Key.mileageRate)
+        defaults.set("custom", forKey: AppSettings.Key.rateMode)
+        await server.enqueue(200, Self.record(rate: 0.55, updatedAt: "2026-10-11T11:00:00+00:00"))
+        await service.sync()
+        #expect(isSynced)
+
+        service.didSignOut()
+
+        #expect(service.status == .idle)
+    }
 }

@@ -13,6 +13,7 @@ struct RootView: View {
             if let session = appSession.current {
                 TripListView()
                     .environment(session.tripSync)
+                    .environment(session.settingsSync)
                     .modelContainer(session.container)
                     // Every @AppStorage setting below reads and writes this account's own suite.
                     .defaultAppStorage(session.defaults)

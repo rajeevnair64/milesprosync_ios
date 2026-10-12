@@ -1,4 +1,5 @@
 import Foundation
+import Observation
 
 /// Keeps the reimbursement settings (`SettingsPayload`) the same on every device and on the
 /// website. The server's copy is the reference; this device remembers the last copy it matched
@@ -9,25 +10,40 @@ import Foundation
 ///     server's are newer (another device saved first) the server's are applied instead;
 ///   - otherwise the server is checked now and then, so a change made elsewhere arrives.
 /// Failures are silent: the next sync attempt (launch, foreground, a trip, a settings change) retries.
+@Observable
 @MainActor
 final class SettingsSyncService {
+    /// Where a change made on this device is on its way to the account, for the Settings screen.
+    /// `idle` means there is nothing to report (no change, signed out, or only a download).
+    enum Status: Equatable {
+        case idle
+        /// Changed on this device, waiting a moment before it is sent.
+        case pending
+        case syncing
+        case synced(Date)
+        /// The last attempt failed; it is retried at the next sync.
+        case failed
+    }
+
+    private(set) var status: Status = .idle
+
     static let baseKey = "settings.sync.baseUpdatedAt"
     static let payloadKey = "settings.sync.payload"
     static let userIDKey = "settings.sync.userID"
     /// How long a matched copy is trusted before the server is asked again.
     static let pullInterval: TimeInterval = 5 * 60
 
-    private let client: APIClient?
-    private let defaults: UserDefaults
-    private let isSignedIn: () -> Bool
-    private let now: () -> Date
-    private var lastPull: Date?
-    private var isSyncing = false
-    private var needsAnotherPass = false
+    @ObservationIgnored private let client: APIClient?
+    @ObservationIgnored private let defaults: UserDefaults
+    @ObservationIgnored private let isSignedIn: () -> Bool
+    @ObservationIgnored private let now: () -> Date
+    @ObservationIgnored private var lastPull: Date?
+    @ObservationIgnored private var isSyncing = false
+    @ObservationIgnored private var needsAnotherPass = false
     /// Bumped on sign-in and sign-out; a pass that started earlier must not write its result.
-    private var epoch = 0
-    private var debounced: Task<Void, Never>?
-    private var observer: (any NSObjectProtocol)?
+    @ObservationIgnored private var epoch = 0
+    @ObservationIgnored private var debounced: Task<Void, Never>?
+    @ObservationIgnored private var observer: (any NSObjectProtocol)?
 
     init(
         client: APIClient?, defaults: UserDefaults, isSignedIn: @escaping () -> Bool,
@@ -72,6 +88,7 @@ final class SettingsSyncService {
         epoch += 1
         lastPull = nil
         debounced?.cancel()
+        status = .idle
     }
 
     func syncNow() {
@@ -80,6 +97,9 @@ final class SettingsSyncService {
 
     private func settingsMayHaveChanged() {
         guard isSignedIn() else { return }
+        if base == nil || SettingsPayload(defaults: defaults) != lastMatched, status != .syncing {
+            status = .pending
+        }
         debounced?.cancel()
         debounced = Task {
             try? await Task.sleep(for: .seconds(2))
@@ -112,20 +132,23 @@ final class SettingsSyncService {
         guard let client else { return }
         let passEpoch = epoch
         let current = SettingsPayload(defaults: defaults)
+        if status == .pending, base != nil, current == lastMatched { status = .idle }
         do {
             if base == nil {
                 // Never matched with this account.
                 if let remote = try await client.fetchSettings() {
                     finish(.pulled(remote), passEpoch)
                 } else {
+                    status = .syncing
                     finish(.pushed(try await client.saveSettings(current, baseUpdatedAt: nil)), passEpoch)
                 }
             } else if current != lastMatched {
+                status = .syncing
                 do {
                     finish(.pushed(try await client.saveSettings(current, baseUpdatedAt: base)), passEpoch)
                 } catch SyncError.server(status: 409, _) {
                     // Another device saved after this one last synced: theirs wins.
-                    if let remote = try await client.fetchSettings() { finish(.pulled(remote), passEpoch) }
+                    if let remote = try await client.fetchSettings() { finish(.pushed(remote), passEpoch) }
                 }
             } else if lastPull.map({ now().timeIntervalSince($0) >= Self.pullInterval }) ?? true {
                 if let remote = try await client.fetchSettings(), remote.updatedAt != base {
@@ -136,6 +159,7 @@ final class SettingsSyncService {
             }
         } catch {
             // Offline, rate limited or signed out: try again at the next trigger.
+            if status == .syncing, passEpoch == epoch { status = .failed }
         }
     }
 
@@ -161,5 +185,8 @@ final class SettingsSyncService {
         defaults.set(record.updatedAt, forKey: Self.baseKey)
         defaults.set(data, forKey: Self.payloadKey)
         lastPull = now()
+        // A change made here reached the account (also when another device's newer copy was taken
+        // instead). A plain download isn't announced.
+        if case .pushed = outcome { status = .synced(now()) }
     }
 }

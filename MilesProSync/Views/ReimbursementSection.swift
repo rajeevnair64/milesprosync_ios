@@ -4,6 +4,7 @@ import SwiftUI
 /// rate of your own, or FAVR (a fixed monthly amount plus a per-mile rate). Your own figures are
 /// stored as typed and are never changed by an app update or a new IRS rate.
 struct ReimbursementSection: View {
+    @Environment(SettingsSyncService.self) private var settingsSync: SettingsSyncService?
     @AppStorage(AppSettings.Key.countryCode) private var countryCode = AppSettings.defaultCountryCode
     @AppStorage(AppSettings.Key.rateMode) private var modeRaw = AppSettings.RateMode.irs.rawValue
     @AppStorage(AppSettings.Key.mileageRate) private var mileageRate = AppSettings.defaultMileageRate
@@ -45,6 +46,10 @@ struct ReimbursementSection: View {
                 field("Fixed per month (\(symbol))", text: $fixedText, placeholder: "0.00")
                 field("Per mile (\(symbol)/mi)", text: $variableText, placeholder: "0.000")
                 field("Minimum business miles", text: $minText, placeholder: "0")
+            }
+
+            if let status = settingsSync?.status, status != .idle {
+                SyncStatusRow(status: status)
             }
         } header: {
             Text("Reimbursement")
@@ -91,5 +96,31 @@ struct ReimbursementSection: View {
         fixedText = AppSettings.formatRate(favrFixed)
         variableText = AppSettings.formatRate(favrPerMile)
         minText = favrMinMiles == 0 ? "0" : String(favrMinMiles)
+    }
+}
+
+/// Whether a change made here has reached the account: saving, saved (with the time) or retrying.
+private struct SyncStatusRow: View {
+    let status: SettingsSyncService.Status
+
+    var body: some View {
+        HStack(spacing: 8) {
+            switch status {
+            case .idle:
+                EmptyView()
+            case .pending, .syncing:
+                ProgressView()
+                Text("Saving to your account…")
+            case .synced(let date):
+                Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+                Text("Saved to your account at \(date.formatted(date: .omitted, time: .shortened))")
+            case .failed:
+                Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                Text("Couldn't save yet. It will retry automatically.")
+            }
+        }
+        .font(.footnote)
+        .foregroundStyle(.secondary)
+        .accessibilityElement(children: .combine)
     }
 }
