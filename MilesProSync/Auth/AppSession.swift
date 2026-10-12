@@ -14,6 +14,7 @@ final class UserSession: Identifiable {
     let container: ModelContainer
     let defaults: UserDefaults
     let tripSync: TripSyncService
+    let settingsSync: SettingsSyncService
     let driveDetection: DriveDetectionService
     /// The website's API, for team features; nil when this build has no server configured.
     let apiClient: APIClient?
@@ -33,6 +34,13 @@ final class UserSession: Identifiable {
         apiClient = client
         let tripSync = TripSyncService(container: container, client: client, defaults: defaults)
         self.tripSync = tripSync
+        let settingsSync = SettingsSyncService(
+            client: client, defaults: defaults, isSignedIn: { [weak tripSync] in tripSync?.signedInEmail != nil }
+        )
+        self.settingsSync = settingsSync
+        tripSync.onSignedIn = { settingsSync.didSignIn(userID: $0) }
+        tripSync.onSignedOut = { settingsSync.didSignOut() }
+        tripSync.onSync = { settingsSync.syncNow() }
         driveDetection = DriveDetectionService(modelContainer: container, defaults: defaults)
         // After the free period, with no subscription, new drives aren't recorded.
         driveDetection.isRecordingAllowed = { AccessStore.isRecordingAllowed() }
@@ -44,6 +52,7 @@ final class UserSession: Identifiable {
     func start() {
         _ = try? TripRetention.purgeExpiredDeletedTrips(in: container)
         tripSync.start()
+        settingsSync.start()
         driveDetection.start()
         // A new year's IRS rate reaches people on the default rate without an app release.
         if let baseURL = apiClient?.config.baseURL {
@@ -53,6 +62,7 @@ final class UserSession: Identifiable {
 
     func stop() {
         driveDetection.stop()
+        settingsSync.stop()
         tripSync.stop()
     }
 

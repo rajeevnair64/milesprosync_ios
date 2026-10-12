@@ -46,6 +46,12 @@ final class TripSyncService {
 
     var isConfigured: Bool { client != nil }
 
+    /// Hooks for what syncs alongside trips (the account's settings): the account connected (with
+    /// its ID), it was disconnected, and a sync pass is starting.
+    @ObservationIgnored var onSignedIn: ((String) -> Void)?
+    @ObservationIgnored var onSignedOut: (() -> Void)?
+    @ObservationIgnored var onSync: (() -> Void)?
+
     @ObservationIgnored private let container: ModelContainer
     @ObservationIgnored private let client: APIClient?
     @ObservationIgnored private let defaults: UserDefaults
@@ -148,6 +154,7 @@ final class TripSyncService {
         signedInEmail = nil
         lastError = nil
         lastSyncedAt = nil
+        onSignedOut?()
     }
 
     /// Deletes the account on the server and signs out. Trips stay on this device, and in the
@@ -161,6 +168,7 @@ final class TripSyncService {
         signedInEmail = nil
         lastError = nil
         lastSyncedAt = nil
+        onSignedOut?()
     }
 
     private func didSignIn(_ session: AuthSession) {
@@ -173,6 +181,7 @@ final class TripSyncService {
         }
         signedInEmail = session.email ?? ""
         lastError = nil
+        onSignedIn?(session.userID)
         syncNow()
     }
 
@@ -198,6 +207,7 @@ final class TripSyncService {
     func sync() async {
         await restoreSessionIfNeeded()
         guard client != nil, signedInEmail != nil else { return }
+        onSync?()
         guard !isSyncing else {
             needsAnotherPass = true
             return

@@ -59,7 +59,7 @@ extension APIClient {
     }
 
     func leaveTeam() async throws -> TeamStatus {
-        try decodeTeam(await authorized("POST", path: "team/leave", body: [:]))
+        try decodeTeam(await authorized("POST", path: "team/leave", body: [String: String]()))
     }
 
     func submitReport(month: String) async throws -> TeamStatus {

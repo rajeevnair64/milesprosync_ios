@@ -54,9 +54,10 @@ While Website Sync is on, the app stores your Apple ID identifier and a cloud si
 
 ### Settings
 
+Your country and how you are reimbursed (the IRS standard rate, a rate of your own, or FAVR figures: a fixed monthly amount, a per-mile rate and a minimum monthly mileage) are stored on your device. If you turn on Website Sync, they are also saved with your account, so your other devices and the website use the same rate. They are deleted when you delete your account.
+
 These are stored only on your device and are not uploaded:
 
-- your country and how you are reimbursed: the IRS standard rate, a rate of your own, or FAVR figures (a fixed monthly amount, a per-mile rate and a minimum monthly mileage)
 - your auto-classification rules: saved places (a name, an address and its coordinates, and whether trips to or from it are Business or Personal) and your work days and hours
 - your list of trip purposes
 

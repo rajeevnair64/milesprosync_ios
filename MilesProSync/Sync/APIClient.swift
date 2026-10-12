@@ -168,7 +168,7 @@ actor APIClient {
 
     /// A request with the signed-in account's token, refreshed and retried once if it was rejected.
     /// `body` makes it a JSON request.
-    func authorized(_ method: String, path: String, body: [String: String]? = nil) async throws -> Data {
+    func authorized(_ method: String, path: String, body: (any Encodable)? = nil) async throws -> Data {
         func request(token: String) throws -> URLRequest {
             var request = URLRequest(url: endpoint(path))
             request.httpMethod = method
