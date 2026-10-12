@@ -84,6 +84,37 @@ struct DriveStateMachineTests {
         #expect(machine.handle(fix(180, speed: 1.5)) == [.returnToIdle])
     }
 
+    @Test func oneMovingFixThenStandingStillNeverStartsATrip() {
+        // Motion detection unavailable (isAutomotive nil): a single moving GPS sample followed by
+        // 45 s of standing still used to count as a confirmed drive and record a zero-mile trip.
+        var machine = DriveStateMachine()
+        machine.isAutomotive = nil
+        _ = machine.handle(fix(0, speed: -1))
+        _ = machine.handle(fix(5, speed: 12))
+        for second in stride(from: 10.0, through: 120, by: 5) {
+            let actions = machine.handle(fix(second, speed: 0))
+            let began = actions.contains { if case .beginTrip = $0 { true } else { false } }
+            #expect(!began, "second \(second)")
+        }
+        #expect(machine.phase != .recording)
+    }
+
+    @Test func aLongStopRestartsTheConfirmationWindow() {
+        var machine = DriveStateMachine()
+        _ = machine.handle(fix(0, speed: -1))
+        _ = machine.handle(fix(5, speed: 12))
+        _ = machine.handle(fix(40, speed: 0)) // stopped past the grace period: earlier evidence is dropped
+        var began = false
+        for second in stride(from: 100.0, through: 140, by: 5) {
+            let actions = machine.handle(fix(second, speed: 12, metersNorth: second * 12))
+            began = began || actions.contains { if case .beginTrip = $0 { true } else { false } }
+        }
+        #expect(!began) // 45 s of driving hasn't passed since the new window opened at 100 s
+        let actions = machine.handle(fix(145, speed: 12, metersNorth: 145 * 12))
+        #expect(actions.contains { if case .beginTrip = $0 { true } else { false } })
+        #expect(machine.phase == .recording)
+    }
+
     @Test func motionSayingNotAutomotiveBlocksConfirmation() {
         var machine = DriveStateMachine()
         machine.isAutomotive = false

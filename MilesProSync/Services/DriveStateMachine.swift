@@ -124,11 +124,19 @@ struct DriveStateMachine {
             return [.startContinuousUpdates]
 
         case .candidateDriving:
-            if speed >= config.movingSpeed, isRouteQuality(location) {
+            let isMoving = speed >= config.movingSpeed && isRouteQuality(location)
+            if !isMoving, let last = candidatePoints.last,
+               location.timestamp.timeIntervalSince(last.timestamp) >= config.stopGraceDuration {
+                // A prolonged stop ends the evidence for this candidate. Brief red lights
+                // remain tolerated, but a later drive needs its own confirmation window.
+                candidatePoints = []
+                candidateSawDrivingSpeed = false
+            }
+            if isMoving {
                 candidatePoints.append(location)
                 if speed >= config.drivingSpeed { candidateSawDrivingSpeed = true }
             }
-            if let first = candidatePoints.first,
+            if isMoving, let first = candidatePoints.first,
                candidateSawDrivingSpeed,
                isAutomotive != false,
                location.timestamp.timeIntervalSince(first.timestamp) >= config.candidateConfirmDuration {

@@ -87,10 +87,12 @@ actor APIClient {
     /// `nonce` is the raw value whose SHA-256 was sent in the Apple request; the server checks it
     /// against the token so an intercepted token can't be replayed.
     func signInWithApple(identityToken: String, nonce: String) async throws -> AuthSession {
+        let generation = sessionGeneration
         let data = try await send(jsonRequest(
             "POST", path: "auth/apple",
             body: ["id_token": identityToken, "nonce": nonce]
         ))
+        guard generation == sessionGeneration else { throw CancellationError() }
         guard let session = decodeSession(data) else { throw SyncError.invalidResponse }
         store(session)
         return session
@@ -99,8 +101,10 @@ actor APIClient {
     /// Forgets the session on this device and, if the server can be reached, revokes its refresh
     /// token there. Offline, the token just goes unused.
     func signOut() async {
-        guard let refreshToken = session?.refreshToken else { return }
+        let refreshToken = session?.refreshToken
+        // Invalidate pending sign-ins even before the first session exists.
         store(nil)
+        guard let refreshToken else { return }
         _ = try? await send(jsonRequest("POST", path: "auth/sign-out", body: ["refresh_token": refreshToken]))
     }
 

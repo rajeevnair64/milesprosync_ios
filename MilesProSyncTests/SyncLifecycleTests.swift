@@ -96,6 +96,33 @@ struct SyncLifecycleTests {
         #expect(signedOut.tokens.load()?.refreshToken == "refresh-new")
     }
 
+    @Test func turningSyncOffWhileSignInIsPendingKeepsItOff() async throws {
+        let signedOut = try SyncLifecycleTests(session: nil)
+        _ = try signedOut.insertTrip()
+        let gate = Gate()
+        await signedOut.server.setOnRequest { request in
+            if request.url?.path() == "/api/v1/auth/apple" { await gate.wait() }
+        }
+        await signedOut.server.enqueue(200, SyncFixtures.tokenResponse(access: "access-new", refresh: "refresh-new"))
+        let service = signedOut.service
+
+        let connect = Task { @MainActor in
+            try? await service.connectWithApple(identityToken: "apple-jwt", nonce: "nonce")
+        }
+        await signedOut.waitUntil("the sign-in request") { await signedOut.paths().contains("/api/v1/auth/apple") }
+
+        // The person turns Website Sync off while Apple's token is still being exchanged.
+        service.signOut()
+        await gate.open()
+        _ = await connect.value
+        try? await Task.sleep(for: .milliseconds(100))
+
+        #expect(service.signedInEmail == nil)
+        #expect(signedOut.tokens.load() == nil)
+        #expect(service.lastError == nil)
+        #expect(await signedOut.paths().contains("/api/v1/trips") == false)
+    }
+
     // MARK: - Refresh
 
     @Test func expiringSessionIsRefreshedBeforePushing() async throws {
@@ -237,5 +264,22 @@ struct SyncLifecycleTests {
 
         let ids = await tripUploads().compactMap { $0["id"] as? String }
         #expect(ids == [id.uuidString, id.uuidString])
+    }
+}
+
+/// Holds a request until the test opens it.
+private actor Gate {
+    private var isOpen = false
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+
+    func wait() async {
+        if isOpen { return }
+        await withCheckedContinuation { waiters.append($0) }
+    }
+
+    func open() {
+        isOpen = true
+        waiters.forEach { $0.resume() }
+        waiters = []
     }
 }

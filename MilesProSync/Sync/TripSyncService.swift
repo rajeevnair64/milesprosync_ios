@@ -122,7 +122,16 @@ final class TripSyncService {
     /// account on first use.
     func connectWithApple(identityToken: String, nonce: String) async throws {
         guard let client else { return }
-        didSignIn(try await client.signInWithApple(identityToken: identityToken, nonce: nonce))
+        let epoch = accountEpoch
+        do {
+            let session = try await client.signInWithApple(identityToken: identityToken, nonce: nonce)
+            guard epoch == accountEpoch else { return }
+            didSignIn(session)
+        } catch {
+            // Turning sync off also dismisses the pending connection's errors.
+            guard epoch == accountEpoch else { return }
+            throw error
+        }
     }
 
     /// Shows why connecting failed (e.g. offline at sign-in) in Settings → Website Sync.
