@@ -77,10 +77,8 @@ final class SubscriptionManager {
         errorMessage = nil
         // One or the other: a person on Teams buys per-user plans only, an individual the rest.
         // Buying before choosing chooses.
-        if let accountType, !accountType.allows(productID: product.id) {
-            errorMessage = accountType == .team
-                ? "You're set up as Teams. Per-user team plans are the only plans for a team."
-                : "You're set up as Individual. Team plans are for teams: switch to Teams first."
+        if let message = accountType?.refusal(forPurchasing: product.id) {
+            errorMessage = message
             return
         }
         isWorking = true

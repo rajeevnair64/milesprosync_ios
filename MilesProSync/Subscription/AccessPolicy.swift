@@ -97,6 +97,15 @@ enum AccountType: String, CaseIterable, Equatable, Sendable {
         }
     }
 
+    /// Why this type may not buy `productID`, shown to the person; nil when it may.
+    func refusal(forPurchasing productID: String) -> String? {
+        guard !allows(productID: productID) else { return nil }
+        return switch self {
+        case .team: "You're set up as Teams. Per-user team plans are the only plans for a team."
+        case .individual: "You're set up as Individual. Team plans are for teams: switch to Teams first."
+        }
+    }
+
     /// The type can be changed only while nothing is paid for; a paid plan pins it.
     static func canChange(in state: AccessState) -> Bool {
         switch state {
