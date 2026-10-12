@@ -1,8 +1,8 @@
 import SwiftUI
 
-/// How trips are paid: the IRS rate (the default, which updates itself each year), a per-mile
+/// How trips are paid: the taxation rate (the default, which updates itself each year), a per-mile
 /// rate of your own, or FAVR (a fixed monthly amount plus a per-mile rate). Your own figures are
-/// stored as typed and are never changed by an app update or a new IRS rate.
+/// stored as typed and are never changed by an app update or a new taxation rate.
 struct ReimbursementSection: View {
     @Environment(SettingsSyncService.self) private var settingsSync: SettingsSyncService?
     @AppStorage(AppSettings.Key.countryCode) private var countryCode = AppSettings.defaultCountryCode
@@ -38,7 +38,7 @@ struct ReimbursementSection: View {
 
             switch mode {
             case .irs:
-                LabeledContent("\(Calendar.current.component(.year, from: .now)) IRS rate",
+                LabeledContent("\(Calendar.current.component(.year, from: .now)) taxation rate",
                                value: "\(symbol)\(AppSettings.formatRate(IRSRates.rate(on: .now)))/mi")
             case .custom:
                 field("Rate (\(symbol)/mi)", text: $rateText, placeholder: "Rate")
@@ -68,7 +68,7 @@ struct ReimbursementSection: View {
     private var footer: some View {
         switch mode {
         case .irs:
-            Text("Each trip is paid at the IRS standard business mileage rate for the year it was made, and a new year's rate is picked up automatically.")
+            Text("Each trip is paid at the taxation standard business mileage rate for the year it was made, and a new year's rate is picked up automatically.")
         case .custom:
             Text(isValid(rateText)
                 ? "Your rate is kept exactly as entered. It never changes unless you change it."

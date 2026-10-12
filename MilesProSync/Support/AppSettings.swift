@@ -21,7 +21,7 @@ enum AppSettings {
 
         var displayName: String {
             switch self {
-            case .irs: "IRS rate"
+            case .irs: "Taxation rate"
             case .custom: "My rate"
             case .favr: "FAVR"
             }
