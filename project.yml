@@ -48,6 +48,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.aisleweb.MilesProSync
+        DEVELOPMENT_TEAM: 94PVULJP4W
         PRODUCT_NAME: MilesProSync
         SWIFT_VERSION: "6.0"
         TARGETED_DEVICE_FAMILY: "1"
