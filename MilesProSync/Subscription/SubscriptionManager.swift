@@ -73,8 +73,11 @@ final class SubscriptionManager {
     func loadProducts() async {
         guard products.isEmpty else { return }
         do {
-            products = try await Product.products(for: ProductID.store)
-                .sorted { $0.price > $1.price }
+            let loaded = try await Product.products(for: ProductID.store)
+            products = loaded.sorted { $0.price > $1.price }
+            errorMessage = loaded.isEmpty
+                ? "Plans aren't available from the App Store right now. Try again in a moment."
+                : nil
         } catch {
             errorMessage = "Couldn't load subscription options. Check your connection and try again."
         }

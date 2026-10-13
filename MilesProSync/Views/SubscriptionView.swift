@@ -7,6 +7,15 @@ struct SubscriptionView: View {
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
+        // A Teams account buys per-user plans only, so it is never shown the individual ones.
+        if subscriptions?.accountType == .team {
+            TeamPlansView()
+        } else {
+            individualPlans
+        }
+    }
+
+    private var individualPlans: some View {
         List {
             if let subscriptions {
                 Section("Your plan") {
@@ -139,10 +148,19 @@ private struct PlanRow: View {
                 Spacer()
                 if isCurrent {
                     Label("Current", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
-                } else if let product, let subscriptions {
-                    Button(buyLabel) { Task { await subscriptions.purchase(product) } }
-                        .buttonStyle(.borderedProminent)
-                        .disabled(subscriptions.isWorking)
+                } else if let subscriptions {
+                    // Shown even before the App Store prices have loaded: tapping loads them
+                    // (retrying a failed load) and then buys.
+                    Button(buyLabel) {
+                        Task {
+                            if subscriptions.product(id) == nil { await subscriptions.loadProducts() }
+                            if let product = subscriptions.product(id) {
+                                await subscriptions.purchase(product)
+                            }
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(subscriptions.isWorking)
                 }
             }
             if let detail, !detail.isEmpty {
@@ -166,6 +184,13 @@ struct TeamPlansView: View {
 
     var body: some View {
         List {
+            if let subscriptions, case .expired = subscriptions.state {
+                Section {
+                    Text("Your plan has ended. Your trips stay on this iPhone and can be exported, but new drives aren't recorded until you subscribe.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+            }
             Section {
                 PlanRow(
                     id: ProductID.teamAnnual, title: "Team yearly", fallbackPrice: "$34.99", per: "/user/year",
@@ -177,6 +202,15 @@ struct TeamPlansView: View {
                 Text("Per user")
             } footer: {
                 Text("For people on a team. Unlimited trips, team reports and approvals. Only your Business trips are ever shared with a team. Subscriptions renew each month or year until cancelled at least 24 hours before the end of the current period; manage or cancel in your Apple ID account settings.")
+            }
+            if let subscriptions {
+                if let message = subscriptions.errorMessage {
+                    Section { Text(message).foregroundStyle(.red) }
+                }
+                Section {
+                    Button("Restore Purchases") { Task { await subscriptions.restore() } }
+                        .disabled(subscriptions.isWorking)
+                }
             }
         }
         .brandedBackground()
