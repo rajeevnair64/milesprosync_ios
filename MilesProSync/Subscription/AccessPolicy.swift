@@ -184,7 +184,8 @@ enum AccessPolicy {
 }
 
 /// Where the free period's start and the last known subscription are kept. The start is in the
-/// Keychain (like the account), so deleting and reinstalling the app doesn't restart it.
+/// Keychain (like the account), so deleting and reinstalling the app doesn't restart it, and is
+/// moved back to the Apple ID's first-download date (`adoptAppStoreStart`), so a new device doesn't either.
 enum AccessStore {
     static let trialItem = KeychainItem(service: "com.aisleweb.MilesProSync.trial", account: "start")
     static let subscribedUntilKey = "access.subscribedUntil"
@@ -203,14 +204,30 @@ enum AccessStore {
         defaults.set(type?.rawValue, forKey: accountTypeKey)
     }
 
+    /// The start recorded in the Keychain, or nil if none has been written yet.
+    static func storedTrialStart(item: KeychainItem = trialItem) -> Date? {
+        guard let data = item.read(), let text = String(data: data, encoding: .utf8),
+              let seconds = TimeInterval(text) else { return nil }
+        return Date(timeIntervalSince1970: seconds)
+    }
+
     /// The first-launch date, recorded now if this is the first time anyone asked.
     static func trialStart(now: Date = .now, item: KeychainItem = trialItem) -> Date {
-        if let data = item.read(), let text = String(data: data, encoding: .utf8),
-           let seconds = TimeInterval(text) {
-            return Date(timeIntervalSince1970: seconds)
-        }
+        if let stored = storedTrialStart(item: item) { return stored }
         item.write(Data(String(now.timeIntervalSince1970).utf8))
         return now
+    }
+
+    /// Ties the free period to the Apple ID: the App Store's first-download date for this Apple ID
+    /// is the same on a new device or after an erase, so it can only move the start earlier, never
+    /// later. A missing date (offline, no App Store record) or one in the future is ignored.
+    /// Returns whether the stored start changed.
+    @discardableResult
+    static func adoptAppStoreStart(_ candidate: Date?, now: Date = .now, item: KeychainItem = trialItem) -> Bool {
+        guard let candidate, candidate <= now else { return false }
+        let current = trialStart(now: now, item: item)
+        guard candidate < current else { return false }
+        return item.write(Data(String(candidate.timeIntervalSince1970).utf8))
     }
 
     static func state(now: Date = .now, defaults: UserDefaults = .standard, item: KeychainItem = trialItem) -> AccessState {

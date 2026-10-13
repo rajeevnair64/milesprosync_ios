@@ -81,6 +81,7 @@ struct SyncLifecycleTests {
         let signedOut = try SyncLifecycleTests(session: nil)
         let id = try signedOut.insertTrip()
         await signedOut.server.enqueue(200, SyncFixtures.tokenResponse(access: "access-new", refresh: "refresh-new"))
+        await signedOut.server.enqueue(200, #"{"trips":[],"next":null}"#) // restore: nothing in the cloud yet
         await signedOut.server.enqueueOK()
 
         try await signedOut.service.connectWithApple(identityToken: "apple-jwt", nonce: "nonce")
@@ -88,7 +89,7 @@ struct SyncLifecycleTests {
         await signedOut.waitUntil("the trip upload") { await signedOut.paths().contains("/api/v1/trips") }
         await signedOut.waitUntil("sync to settle") { !signedOut.service.isSyncing && signedOut.service.pendingCount == 0 }
 
-        #expect(await signedOut.paths().prefix(2) == ["/api/v1/auth/apple", "/api/v1/trips"])
+        #expect(await signedOut.paths().prefix(3) == ["/api/v1/auth/apple", "/api/v1/trips/restore", "/api/v1/trips"])
         let upload = try #require(await signedOut.server.requests.last)
         #expect(upload.value(forHTTPHeaderField: "Authorization") == "Bearer access-new")
         #expect(await signedOut.tripUploads().compactMap { $0["id"] as? String } == [id.uuidString])
@@ -261,6 +262,7 @@ struct SyncLifecycleTests {
         service.signOut()
         await waitUntil("the sign-out request") { await paths().contains("/api/v1/auth/sign-out") }
         await server.enqueue(200, SyncFixtures.tokenResponse(access: "access-b", refresh: "refresh-b", userID: "user-2"))
+        await server.enqueue(200, #"{"trips":[],"next":null}"#)
         await server.enqueueOK()
         try await service.connectWithApple(identityToken: "apple-jwt", nonce: "nonce")
         await waitUntil("the second upload") { await tripUploads().count == 2 }

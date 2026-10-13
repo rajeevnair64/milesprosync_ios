@@ -18,6 +18,9 @@ final class DriveDetectionService {
     @ObservationIgnored var onTripFinished: (@MainActor () -> Void)?
     /// Asked before a trip begins; false (free period over, no subscription) records nothing new.
     @ObservationIgnored var isRecordingAllowed: @MainActor () -> Bool = { true }
+    /// While true, the first location prompt is held back (onboarding explains it first). The
+    /// prompt is shown by calling `start()` again once this turns false.
+    @ObservationIgnored var defersPermissionPrompt: @MainActor () -> Bool = { false }
 
     private let locationManager: any LocationManaging
     private let motionActivityManager = CMMotionActivityManager()
@@ -98,6 +101,7 @@ final class DriveDetectionService {
             hasStarted = true
             enqueue { await self.recoverAfterLaunch() }
         case .notDetermined:
+            guard !defersPermissionPrompt() else { break }
             locationManager.requestWhenInUseAuthorization()
         default:
             // Without access nothing can resume a trip left in progress, so finish it where it

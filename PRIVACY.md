@@ -37,7 +37,7 @@ For each drive, the app creates a trip record containing:
 - distance driven
 - start and end street addresses (see "Address lookup" below)
 - the classification you choose (Business, Personal, or Unclassified), or that the app set for you from your saved places and work hours, and any notes
-- an optional purpose you pick for the trip (for example "Client visit"), which stays on your device and is not uploaded
+- an optional purpose you pick for the trip (for example "Client visit"), which is uploaded with the trip if you use Website Sync
 - whether and when you deleted the trip
 
 You can also add a trip yourself, for a drive the app missed, and edit a trip's times, addresses, distance, classification, purpose and notes. A trip you add by hand has no GPS route; it has the addresses you typed, the coordinates Apple finds for them, and the distance you enter.
@@ -50,7 +50,7 @@ The app works without an account. If you want to view your trips on the MilesPro
 
 If you sign in, we receive from Sign in with Apple a unique identifier for your Apple ID in this app and your email address. If you choose "Hide My Email", we receive a private relay address from Apple instead of your real one. We do not request your name, and we never receive your Apple ID password.
 
-While Website Sync is on, the app stores your Apple ID identifier and a cloud sign-in token in the iOS Keychain on your device, so it can keep uploading trips in the background. When you turn on Website Sync, trips already on your device are uploaded, including deleted trips kept as a record (see "Deleted trips"). Trips still in progress are never uploaded.
+While Website Sync is on, the app stores your Apple ID identifier and a cloud sign-in token in the iOS Keychain on your device, so it can keep uploading trips in the background. When you turn on Website Sync, trips already on your device are uploaded, including deleted trips kept as a record (see "Deleted trips"). Trips still in progress are never uploaded. When you sign in again on a new or reinstalled app, the app downloads your uploaded trips and settings from the cloud and puts them back on the device. Trips you deleted are not restored.
 
 ### Settings
 
@@ -65,7 +65,7 @@ The app also asks our website for the taxation standard mileage rate by year, so
 
 ### Website
 
-If you sign in on the MilesProSync website, it receives the same Sign in with Apple information described above and shows the trips uploaded by Website Sync. The website only displays your trips; it cannot change them.
+If you sign in on the MilesProSync website, it receives the same Sign in with Apple information described above and shows the trips uploaded by Website Sync. The website displays your trips and lets you delete one; it cannot otherwise change them. A trip you delete on the website is deleted in the app the next time it syncs, and is kept as a record like any deleted trip (see "Deleted trips").
 
 The website uses only these cookies, all needed for it to work. There are no advertising or analytics cookies.
 
@@ -80,7 +80,7 @@ Route drawings on the website are made in your browser from your own trip data; 
 
 ### Subscriptions
 
-Subscriptions are bought and managed through Apple (in-app purchase), and Apple handles your payment details; we never receive your card or payment information. The app keeps the date you first used it, the expiry date of your current subscription, and, if you bought the five-year purchase, the date you bought it and the features it covers, on your device, to decide whether new drives and newer features are available. The first-use date is kept in the iOS Keychain, which survives removing the app, so reinstalling doesn't restart the two free months.
+Subscriptions are bought and managed through Apple (in-app purchase), and Apple handles your payment details; we never receive your card or payment information. The app keeps the date you first used it, the expiry date of your current subscription, and, if you bought the five-year purchase, the date you bought it and the features it covers, on your device, to decide whether new drives and newer features are available. The first-use date is kept in the iOS Keychain, which survives removing the app, so reinstalling doesn't restart the two free months. The app also asks the App Store (through StoreKit) for the date your Apple ID first got the app, and uses it if it is earlier, so the two free months don't restart on a new device either. Apple provides that date; it is not sent to us.
 
 If you subscribe to a Team plan, the app also sends Apple's signed receipt for that subscription to our server, together with your account, so the server can confirm the subscription is active. We store the product, the expiry date, and the original transaction identifier, until you delete your website account.
 
@@ -127,7 +127,7 @@ We may also disclose information if required by law, or to protect the rights an
 
 ## Exports you share
 
-Exports (CSV, PDF, Excel) are created on your device and include trip dates, addresses, distances, classifications, trip purposes, and reimbursement amounts (including any FAVR fixed amount). When you share an export, for example by email or AirDrop, the recipient receives that information. We do not see or control exports you share.
+Exports (CSV, PDF, Excel) are created on your device, or on the website if you download them there, and include trip dates, addresses, distances, classifications, trip purposes, and reimbursement amounts (including any FAVR fixed amount). When you share an export, for example by email or AirDrop, the recipient receives that information. We do not see or control exports you share.
 
 ## Storage and security
 
@@ -140,7 +140,7 @@ Exports (CSV, PDF, Excel) are created on your device and include trip dates, add
 
 We keep trip records for **four years from the date of each trip** for tax and audit record-keeping, and then permanently erase them.
 
-- **On your device**, trips you have deleted are erased once they are four years old. Trips still in your trip list stay until you delete them. Turning off Website Sync keeps your trips and settings on the device. Removing the app erases its data from the device, including your sign-in, except the date you first used the app, which stays in the iOS Keychain so the free period isn't restarted (see "Subscriptions").
+- **On your device**, trips you have deleted are erased once they are four years old. Trips still in your trip list stay until you delete them. Turning off Website Sync keeps your trips and settings on the device. Removing the app erases its data from the device, including your sign-in (if you used Website Sync, signing in again restores your uploaded trips), except the date you first used the app, which stays in the iOS Keychain so the free period isn't restarted (see "Subscriptions").
 - **In the cloud** (only if you used Website Sync), every trip record, including deleted trips, is erased four years after the date of the trip. This applies even if you delete your account: deleting your account removes your cloud login and email address, but trip records already uploaded are kept until they reach four years old.
 - **Account information** (your email address and login) and your subscription record are kept until you delete your website account.
 - **Team records** (membership, reports, invites and the activity log) are kept for four years from the date they were made, or from the date you left the team, and then erased.
@@ -152,7 +152,7 @@ We keep trip records for **four years from the date of each trip** for tax and a
 - **Stopping Sign in with Apple:** you can stop using Sign in with Apple for the app in iOS Settings → your name → Sign-In & Security → Sign in with Apple. The app then turns off Website Sync.
 - **Access and copies:** you can export your trips at any time from the app.
 - **Correction:** you can edit a trip's details in the app (times, addresses, distance, classification, purpose and notes), and add a trip the app missed.
-- **Your saved places, work hours, purposes and rates:** you can change or delete these at any time in Settings. They never leave your device.
+- **Your saved places, work hours, your list of purposes and rates:** you can change or delete these at any time in Settings. They never leave your device (your reimbursement settings are saved with your account if you use Website Sync; the purpose you pick for a trip is part of the trip).
 - **Subscriptions:** you can manage or cancel a subscription in your Apple ID account settings. Cancelling doesn't delete your trips.
 - **Leaving a team:** Settings → Team → Leave Team ends a team's access to your trips right away.
 - **Account deletion:** you can delete your website account in the app under Settings → Website Sync → Delete Website Account, or on the website's Account page. This removes your cloud login and email address and your subscription record immediately, ends any team membership, and turns off Website Sync; uploaded trip records are kept until four years after each trip's date, as described in "Retention", then erased. You can also contact us at admin@aisleweb.com.

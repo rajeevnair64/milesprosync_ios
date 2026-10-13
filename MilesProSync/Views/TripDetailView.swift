@@ -9,6 +9,9 @@ struct TripDetailView: View {
     @State private var confirmingDelete = false
     @State private var confirmingFinish = false
     @State private var showingEdit = false
+    @State private var mergeCandidate: Trip?
+    @Query(filter: #Predicate<Trip> { $0.deletedAt == nil }, sort: \Trip.startDate)
+    private var allTrips: [Trip]
     @AppStorage(TripPurposes.key) private var storedPurposes = TripPurposes.encode(TripPurposes.defaults)
     @Environment(AppSession.self) private var appSession
     @FocusState private var notesFocused: Bool
@@ -70,7 +73,7 @@ struct TripDetailView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Purpose")
                         .font(.headline)
-                    Picker("Purpose", selection: $trip.purpose) {
+                    Picker("Purpose", selection: Binding(get: { trip.purpose }, set: { trip.setPurpose($0) })) {
                         Text("None").tag(String?.none)
                         ForEach(purposeChoices, id: \.self) { purpose in
                             Text(purpose).tag(String?.some(purpose))
@@ -80,6 +83,8 @@ struct TripDetailView: View {
                     .onChange(of: trip.purpose) { try? modelContext.save() }
                 }
                 .padding(.horizontal)
+
+                if !trip.isInProgress { recoverySection }
 
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Notes")
@@ -130,6 +135,22 @@ struct TripDetailView: View {
         } message: {
             Text("It will be removed from your trip list and exports.")
         }
+        .confirmationDialog(
+            "Merge these two trips?",
+            isPresented: Binding(get: { mergeCandidate != nil }, set: { if !$0 { mergeCandidate = nil } }),
+            titleVisibility: .visible
+        ) {
+            Button("Merge Trips") {
+                if let other = mergeCandidate {
+                    let kept = Trip.merge(trip, other)
+                    try? modelContext.save()
+                    if kept !== trip { dismiss() }
+                }
+                mergeCandidate = nil
+            }
+        } message: {
+            Text("They become one trip from the first start to the last end. The distance between them isn't counted.")
+        }
         .sheet(isPresented: $showingEdit) {
             ManualTripView(editing: trip)
         }
@@ -137,6 +158,40 @@ struct TripDetailView: View {
         .onChange(of: trip.endLatitude) { fitCamera() }
         .onAppear { fitCamera() }
         .onDisappear { try? modelContext.save() }
+    }
+
+    private var previousTrip: Trip? {
+        allTrips.last { $0.endDate <= trip.startDate && $0.canMerge(with: trip) }
+    }
+
+    private var nextTrip: Trip? {
+        allTrips.first { $0.startDate >= trip.endDate && $0.canMerge(with: trip) }
+    }
+
+    /// Ways to fix a trip that tracking got wrong: edit it, or join it to a neighbour it was split from.
+    private var recoverySection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Something wrong?")
+                .font(.headline)
+            Button { showingEdit = true } label: {
+                Label("Correct distance, times or addresses", systemImage: "slider.horizontal.3")
+            }
+            if let previous = previousTrip {
+                Button { mergeCandidate = previous } label: {
+                    Label("Merge with the previous trip", systemImage: "arrow.triangle.merge")
+                }
+            }
+            if let next = nextTrip {
+                Button { mergeCandidate = next } label: {
+                    Label("Merge with the next trip", systemImage: "arrow.triangle.merge")
+                }
+            }
+            Text("Missed a drive entirely? Tap + on the Trips screen to add it.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .font(.subheadline)
+        .padding(.horizontal)
     }
 
     /// The saved purposes, plus the trip's own if it was removed from the list since.

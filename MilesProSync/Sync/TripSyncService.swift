@@ -43,6 +43,14 @@ final class TripSyncService {
     private(set) var lastSyncedAt: Date?
     private(set) var lastError: String?
     private(set) var pendingCount = 0
+    /// True while trips are being downloaded from the account after signing in on a new or
+    /// reinstalled app.
+    private(set) var isRestoring = false
+    /// How many trips the latest restore added to this device.
+    private(set) var restoredCount = 0
+    /// Turn on to have each sync also delete the trips the person deleted on the website. Off in
+    /// the service's own tests; the app enables it (`UserSession`).
+    @ObservationIgnored var appliesWebDeletions = false
 
     var isConfigured: Bool { client != nil }
 
@@ -68,6 +76,10 @@ final class TripSyncService {
     /// Trips carry their full GPS route, so batches stay small to keep each request modest.
     private static let batchSize = 10
     private static let lastUserIDKey = "sync.lastUserID"
+    /// The account whose trips still need pulling down. Set on sign-in, cleared once every page has
+    /// been stored, so a restore cut short (offline, app closed) resumes on the next sync.
+    private static let restoreUserIDKey = "sync.restoreUserID"
+    private static let restorePageSize = 20
 
     private static var pendingTrips: FetchDescriptor<Trip> {
         FetchDescriptor(predicate: #Predicate { !$0.isInProgress && $0.revision != $0.uploadedRevision })
@@ -150,6 +162,7 @@ final class TripSyncService {
         hasRestoredSession = true
         accountEpoch += 1
         debouncedSync?.cancel()
+        defaults.removeObject(forKey: Self.restoreUserIDKey)
         Task { await client.signOut() }
         signedInEmail = nil
         lastError = nil
@@ -165,6 +178,7 @@ final class TripSyncService {
         hasRestoredSession = true
         accountEpoch += 1
         debouncedSync?.cancel()
+        defaults.removeObject(forKey: Self.restoreUserIDKey)
         signedInEmail = nil
         lastError = nil
         lastSyncedAt = nil
@@ -179,6 +193,9 @@ final class TripSyncService {
             resetUploadState()
             defaults.set(session.userID, forKey: Self.lastUserIDKey)
         }
+        // Always pulled on sign-in: a reinstalled app has no trips, and an app that already has some
+        // only gains the ones it is missing.
+        defaults.set(session.userID, forKey: Self.restoreUserIDKey)
         signedInEmail = session.email ?? ""
         lastError = nil
         onSignedIn?(session.userID)
@@ -214,15 +231,96 @@ final class TripSyncService {
         }
         isSyncing = true
         beginBackgroundTask()
+        let restoreError = await restoreTripsIfNeeded()
+        if appliesWebDeletions { await applyWebDeletions() }
         repeat {
             needsAnotherPass = false
             await syncPendingTrips()
         } while needsAnotherPass && lastError == nil && signedInEmail != nil && !Task.isCancelled
+        // Uploading still ran, but a restore that failed is shown (the upload pass clears errors).
+        if let restoreError, lastError == nil, signedInEmail != nil { lastError = restoreError }
         isSyncing = false
         endBackgroundTask()
-        if signedInEmail != nil, pendingCount > 0 {
+        if signedInEmail != nil, pendingCount > 0 || restoreError != nil {
             retryScheduler.scheduleRetry()
         }
+    }
+
+    /// Downloads the account's trips that this device doesn't have, a page at a time, so signing in
+    /// on a reinstalled app or a new device brings the history back. Trips already on the device are
+    /// left alone (the device's copy wins), and restored trips are stored as already uploaded.
+    /// Runs before uploading, so a trip is never sent back just because it was missing locally.
+    /// Returns the error's text if the restore failed and will be retried; nil otherwise.
+    @discardableResult
+    func restoreTripsIfNeeded() async -> String? {
+        guard let client, let userID = defaults.string(forKey: Self.restoreUserIDKey) else { return nil }
+        let epoch = accountEpoch
+        isRestoring = true
+        defer { isRestoring = false }
+        var cursor: UUID?
+        var added = 0
+        do {
+            repeat {
+                let page = try await client.restoreTrips(after: cursor, limit: Self.restorePageSize)
+                guard epoch == accountEpoch else { return nil }
+                added += try storeRestored(page.trips)
+                cursor = page.next
+            } while cursor != nil && !Task.isCancelled
+        } catch {
+            if error is CancellationError || (error as? URLError)?.code == .cancelled { return nil }
+            guard epoch == accountEpoch else { return nil }
+            lastError = error.localizedDescription
+            if case SyncError.sessionExpired = error { signedInEmail = nil }
+            restoredCount = added
+            return error.localizedDescription
+        }
+        guard !Task.isCancelled, epoch == accountEpoch else { return nil }
+        restoredCount = added
+        // Only the account that was restored is marked done (a sign-in as someone else meanwhile
+        // would have changed the key).
+        if defaults.string(forKey: Self.restoreUserIDKey) == userID {
+            defaults.removeObject(forKey: Self.restoreUserIDKey)
+        }
+        refreshPendingCount()
+        return nil
+    }
+
+    /// Deletes, on this device, the trips the person deleted on the website. Each goes through
+    /// `markDeleted()`, so it is kept as a record like any deleted trip and the deletion uploads.
+    /// A failure is ignored here (the next sync tries again); only an expired session matters.
+    func applyWebDeletions() async {
+        guard let client, signedInEmail != nil else { return }
+        let epoch = accountEpoch
+        do {
+            let ids = try await client.webDeletedTripIDs()
+            guard epoch == accountEpoch, !ids.isEmpty else { return }
+            let context = ModelContext(container)
+            let trips = try context.fetch(FetchDescriptor<Trip>(predicate: #Predicate { ids.contains($0.id) && $0.deletedAt == nil }))
+            guard !trips.isEmpty else { return }
+            trips.forEach { $0.markDeleted() }
+            try context.save()
+            refreshPendingCount()
+        } catch SyncError.sessionExpired {
+            guard epoch == accountEpoch else { return }
+            signedInEmail = nil
+        } catch {
+            return
+        }
+    }
+
+    /// Inserts the trips this device doesn't have yet; returns how many were added.
+    private func storeRestored(_ trips: [RestoredTrip]) throws -> Int {
+        guard !trips.isEmpty else { return 0 }
+        let context = ModelContext(container)
+        let ids = trips.map(\.id)
+        let existing = Set(try context.fetch(FetchDescriptor<Trip>(predicate: #Predicate { ids.contains($0.id) })).map(\.id))
+        var added = 0
+        for restored in trips where !existing.contains(restored.id) {
+            context.insert(restored.makeTrip())
+            added += 1
+        }
+        try context.save()
+        return added
     }
 
     /// One upload pass over every pending trip, in batches. Stops at the first failure (or when

@@ -34,6 +34,7 @@ final class UserSession: Identifiable {
         apiClient = client
         let tripSync = TripSyncService(container: container, client: client, defaults: defaults)
         self.tripSync = tripSync
+        tripSync.appliesWebDeletions = true
         let settingsSync = SettingsSyncService(
             client: client, defaults: defaults, isSignedIn: { [weak tripSync] in tripSync?.signedInEmail != nil }
         )
@@ -44,6 +45,9 @@ final class UserSession: Identifiable {
         driveDetection = DriveDetectionService(modelContainer: container, defaults: defaults)
         // After the free period, with no subscription, new drives aren't recorded.
         driveDetection.isRecordingAllowed = { AccessStore.isRecordingAllowed() }
+        // First launch: the onboarding screens explain tracking before the system prompt appears.
+        let accountDefaults = defaults
+        driveDetection.defersPermissionPrompt = { !Onboarding.isComplete(defaults: accountDefaults) }
         driveDetection.onTripFinished = { tripSync.syncNow() }
         // Settings from before reimbursement methods existed: settle which one this account was using.
         AppSettings.resolveRateMode(defaults: defaults)

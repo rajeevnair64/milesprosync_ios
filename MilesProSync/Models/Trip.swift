@@ -30,7 +30,7 @@ final class Trip {
     /// kept on the device and in the cloud as a record; see `markDeleted()`.
     var deletedAt: Date? = nil
     /// Why the drive was made (e.g. "Client visit"), picked from the purposes in Settings. Kept on
-    /// the device and in exports; not part of the website upload.
+    /// the device, in exports and in the website upload.
     var purpose: String? = nil
 
     @Relationship(deleteRule: .cascade, inverse: \RoutePoint.trip)
@@ -83,6 +83,13 @@ final class Trip {
         let newValue = trimmed.isEmpty ? nil : text
         guard newValue != notes else { return }
         notes = newValue
+        revision += 1
+    }
+
+    /// Sets why the drive was made (nil clears it) and marks the trip for upload.
+    func setPurpose(_ newValue: String?) {
+        guard newValue != purpose else { return }
+        purpose = newValue
         revision += 1
     }
 

@@ -163,6 +163,54 @@ struct AccessPolicyTests {
         #expect(AccessStore.state(now: now, defaults: defaults, item: item) == .expired)
     }
 
+    private func trialItem() -> KeychainItem {
+        KeychainItem(service: "com.aisleweb.MilesProSync.tests.\(UUID().uuidString)", account: "start")
+    }
+
+    @Test func aFreshDeviceTakesTheAppStoreFirstDownloadAsTheTrialStart() {
+        let item = trialItem()
+        defer { _ = item.write(nil) }
+        let now = date(2026, 5, 1)
+        // The new device just recorded "now"; the Apple ID first got the app in January.
+        #expect(AccessStore.trialStart(now: now, item: item) == now)
+        #expect(AccessStore.adoptAppStoreStart(date(2026, 1, 10), now: now, item: item))
+        #expect(AccessStore.trialStart(now: now, item: item) == date(2026, 1, 10))
+        #expect(AccessStore.state(now: now, defaults: UserDefaults(suiteName: "x-\(UUID())")!, item: item) == .expired)
+    }
+
+    @Test func theAppStoreDateNeverMovesTheTrialStartLater() {
+        let item = trialItem()
+        defer { _ = item.write(nil) }
+        let now = date(2026, 5, 1)
+        _ = item.write(Data(String(date(2026, 2, 1).timeIntervalSince1970).utf8))
+        #expect(!AccessStore.adoptAppStoreStart(date(2026, 3, 1), now: now, item: item))
+        #expect(AccessStore.storedTrialStart(item: item) == date(2026, 2, 1))
+    }
+
+    @Test func aMissingOrFutureAppStoreDateIsIgnored() {
+        let item = trialItem()
+        defer { _ = item.write(nil) }
+        let now = date(2026, 5, 1)
+        #expect(!AccessStore.adoptAppStoreStart(nil, now: now, item: item))
+        #expect(!AccessStore.adoptAppStoreStart(date(2026, 6, 1), now: now, item: item))
+        #expect(AccessStore.storedTrialStart(item: item) == nil)
+    }
+
+    @Test @MainActor func theManagerAppliesTheAppStoreFirstDownload() async {
+        let suite = "access-origin-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let item = trialItem()
+        defer { _ = item.write(nil) }
+        let firstDownload = Date(timeIntervalSince1970: (Date.now.timeIntervalSince1970 - 400 * 86_400).rounded())
+
+        let manager = SubscriptionManager(defaults: defaults, trialItem: item, appStoreFirstDownload: { firstDownload })
+        await manager.adoptAppStoreStart()
+
+        #expect(AccessStore.storedTrialStart(item: item) == firstDownload)
+        #expect(manager.state == .expired)
+    }
+
     @Test func teamStatusDecodesTheServersResponse() throws {
         let json = """
         {"subscription":{"active":true,"expires_at":"2026-11-10T12:00:00.123456+00:00","price":"$3.99","product_ids":["x"]},

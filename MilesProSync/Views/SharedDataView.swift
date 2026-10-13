@@ -29,6 +29,7 @@ struct SharedDataSections: View {
             item("mappin.and.ellipse", "Start and end location (coordinates) and street addresses")
             item("point.topleft.down.to.point.bottomright.curvepath", "The full GPS route: a point about every 5 seconds or 20 meters, each with position, time, speed and GPS accuracy")
             item("tag", "Classification (Business, Personal or Unclassified) and whether you set it yourself")
+            item("briefcase", "The purpose you pick for a trip (for example \"Client visit\")")
             item("note.text", "Your notes")
             item("trash", "A trip ID, and when you deleted the trip, if you did")
         }

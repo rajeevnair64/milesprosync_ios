@@ -164,13 +164,42 @@ actor APIClient {
         _ = try await send(request)
     }
 
+    /// One page of the account's trips in the cloud, for restoring them onto a reinstalled app or a
+    /// new device. Pass the previous page's `next` as `after`; a page without `next` is the last.
+    func restoreTrips(after: UUID? = nil, limit: Int = 20) async throws -> RestoredTripPage {
+        var query = [URLQueryItem(name: "limit", value: String(limit))]
+        if let after { query.append(URLQueryItem(name: "after", value: after.uuidString.lowercased())) }
+        let data = try await authorized("GET", path: "trips/restore", query: query)
+        do {
+            return try RestoredTripPage.decode(data)
+        } catch {
+            throw SyncError.invalidResponse
+        }
+    }
+
+    /// The IDs of trips the person deleted on the website, for the app to delete its copies of.
+    func webDeletedTripIDs() async throws -> [UUID] {
+        struct Response: Decodable { let tripIDs: [UUID]
+            private enum CodingKeys: String, CodingKey { case tripIDs = "trip_ids" }
+        }
+        let data = try await authorized("GET", path: "trips/deletions")
+        guard let response = try? JSONDecoder().decode(Response.self, from: data) else {
+            throw SyncError.invalidResponse
+        }
+        return response.tripIDs
+    }
+
     // MARK: - Authorized requests
 
     /// A request with the signed-in account's token, refreshed and retried once if it was rejected.
     /// `body` makes it a JSON request.
-    func authorized(_ method: String, path: String, body: (any Encodable)? = nil) async throws -> Data {
+    func authorized(
+        _ method: String, path: String, query: [URLQueryItem] = [], body: (any Encodable)? = nil
+    ) async throws -> Data {
         func request(token: String) throws -> URLRequest {
-            var request = URLRequest(url: endpoint(path))
+            var url = endpoint(path)
+            if !query.isEmpty { url.append(queryItems: query) }
+            var request = URLRequest(url: url)
             request.httpMethod = method
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
             if let body {

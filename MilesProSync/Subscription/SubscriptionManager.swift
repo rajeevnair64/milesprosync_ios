@@ -20,9 +20,25 @@ final class SubscriptionManager {
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private var updatesTask: Task<Void, Never>?
 
-    init(defaults: UserDefaults = .standard) {
+    @ObservationIgnored private let trialItem: KeychainItem
+    @ObservationIgnored private let appStoreFirstDownload: @Sendable () async -> Date?
+
+    /// The date this Apple ID first got the app, verified by StoreKit; nil when it can't be read
+    /// (offline, or no App Store record such as a local debug run).
+    nonisolated static func storeKitFirstDownload() async -> Date? {
+        guard case .verified(let transaction)? = try? await AppTransaction.shared else { return nil }
+        return transaction.originalPurchaseDate
+    }
+
+    init(
+        defaults: UserDefaults = .standard,
+        trialItem: KeychainItem = AccessStore.trialItem,
+        appStoreFirstDownload: @escaping @Sendable () async -> Date? = SubscriptionManager.storeKitFirstDownload
+    ) {
         self.defaults = defaults
-        let initial = AccessStore.state(defaults: defaults)
+        self.trialItem = trialItem
+        self.appStoreFirstDownload = appStoreFirstDownload
+        let initial = AccessStore.state(defaults: defaults, item: trialItem)
         state = initial
         accountType = AccountType.resolve(stored: AccessStore.storedAccountType(defaults: defaults), state: initial)
         updatesTask = Task { [weak self] in
@@ -145,13 +161,20 @@ final class SubscriptionManager {
             defaults: defaults
         )
         teamTransaction = plan == .team ? best?.jws : nil
-        state = AccessStore.state(defaults: defaults)
+        await adoptAppStoreStart()
+        state = AccessStore.state(defaults: defaults, item: trialItem)
         // What was paid for decides the type, and is remembered if the plan later lapses.
         let resolved = AccountType.resolve(stored: AccessStore.storedAccountType(defaults: defaults), state: state)
         if resolved != AccessStore.storedAccountType(defaults: defaults) {
             AccessStore.saveAccountType(resolved, defaults: defaults)
         }
         accountType = resolved
+    }
+
+    /// Moves the free period's start back to this Apple ID's first download, if that is earlier.
+    func adoptAppStoreStart() async {
+        AccessStore.adoptAppStoreStart(await appStoreFirstDownload(), item: trialItem)
+        state = AccessStore.state(defaults: defaults, item: trialItem)
     }
 
     private func handle(_ result: VerificationResult<Transaction>) async {

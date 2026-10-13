@@ -225,4 +225,38 @@ struct TripSyncServiceTests {
         #expect(trip.revision == before + 1)
         #expect(trip.uploadedRevision == 0)
     }
+
+    @Test func changingThePurposeMakesTheTripPendingAndUploadsIt() async throws {
+        let id = try insertTrip()
+        await server.enqueueOK(2)
+        await service.sync()
+        #expect(service.pendingCount == 0)
+
+        let context = ModelContext(container)
+        let stored = try #require(try context.fetch(FetchDescriptor<Trip>(predicate: #Predicate { $0.id == id })).first)
+        stored.setPurpose("Client visit")
+        try context.save()
+        service.syncNow()
+        await service.sync()
+
+        let uploads = await server.requests
+            .filter { $0.url?.path() == "/api/v1/trips" }
+            .flatMap { (SyncFixtures.body(of: $0) as? [[String: Any]]) ?? [] }
+        #expect(uploads.last?["purpose"] as? String == "Client visit")
+        #expect(uploads.first?["purpose"] is NSNull)
+    }
+
+    @Test func settingTheSamePurposeAgainChangesNothing() throws {
+        let trip = Trip(
+            startDate: .now, endDate: .now, distanceMiles: 1,
+            startLatitude: 0, startLongitude: 0, endLatitude: 0, endLongitude: 0
+        )
+        trip.setPurpose("Client visit")
+        let revision = trip.revision
+        trip.setPurpose("Client visit")
+        #expect(trip.revision == revision)
+        trip.setPurpose(nil)
+        #expect(trip.purpose == nil)
+        #expect(trip.revision == revision + 1)
+    }
 }

@@ -9,6 +9,15 @@ struct TripListView: View {
     @State private var showingSettings = false
     @State private var showingAddTrip = false
     @State private var confirmingFinish = false
+    @State private var showingLocationHelp = false
+    @State private var showingReview = false
+    @State private var showingPlans = false
+    @AppStorage(AppSettings.Key.mileageRate) private var mileageRate = AppSettings.defaultMileageRate
+    @AppStorage(AppSettings.Key.countryCode) private var countryCode = AppSettings.defaultCountryCode
+    @AppStorage(AppSettings.Key.rateMode) private var rateMode = AppSettings.RateMode.irs.rawValue
+    @AppStorage(AppSettings.Key.favrFixedMonthly) private var favrFixedMonthly = 0.0
+    @AppStorage(AppSettings.Key.favrPerMile) private var favrPerMile = 0.0
+    @AppStorage(AppSettings.Key.favrMinMonthlyMiles) private var favrMinMonthlyMiles = 0.0
     @Environment(AppSession.self) private var appSession
     @Environment(SubscriptionManager.self) private var subscriptions: SubscriptionManager?
 
@@ -46,6 +55,16 @@ struct TripListView: View {
                                     : nil
                             )
                             .swipeActions(edge: .leading) {
+                                if !trip.isInProgress {
+                                    Button { classify(trip, as: .business) } label: {
+                                        Label("Business", systemImage: "briefcase")
+                                    }
+                                    .tint(TripClassification.business.accentColor)
+                                    Button { classify(trip, as: .personal) } label: {
+                                        Label("Personal", systemImage: "person")
+                                    }
+                                    .tint(TripClassification.personal.accentColor)
+                                }
                                 if trip.isInProgress {
                                     Button {
                                         confirmingFinish = true
@@ -103,6 +122,15 @@ struct TripListView: View {
             .sheet(isPresented: $showingAddTrip) {
                 ManualTripView()
             }
+            .sheet(isPresented: $showingLocationHelp) {
+                LocationAccessView()
+            }
+            .sheet(isPresented: $showingPlans) {
+                NavigationStack { SubscriptionView() }
+            }
+            .sheet(isPresented: $showingReview) {
+                ReviewTripsView(trips: needingReview)
+            }
             .sheet(isPresented: $showingSettings) {
                 SettingsView()
             }
@@ -122,28 +150,117 @@ struct TripListView: View {
         }
     }
 
+    private var status: RecordingStatus {
+        RecordingStatus.resolve(
+            authorization: appSession.current?.driveDetection.authorizationStatus ?? .notDetermined,
+            planAllowsRecording: subscriptions?.state.allowsRecording ?? true,
+            isRecording: trips.contains(where: \.isInProgress)
+        )
+    }
+
+    /// Finished trips that still need a Business or Personal choice.
+    private var needingReview: [Trip] {
+        trips.filter { !$0.isInProgress && $0.classification == .unclassified }
+    }
+
+    private var rate: ReimbursementRate {
+        AppSettings.reimbursementRate(
+            mode: AppSettings.RateMode(rawValue: rateMode) ?? .irs,
+            customPerMile: mileageRate,
+            favrFixedMonthly: favrFixedMonthly, favrPerMile: favrPerMile, favrMinMonthlyMiles: favrMinMonthlyMiles,
+            countryCode: countryCode
+        )
+    }
+
+    private func statusAction() {
+        guard case .actionNeeded(let reason) = status else { return }
+        switch reason {
+        case .planExpired: showingPlans = true
+        default: showingLocationHelp = true
+        }
+    }
+
     private var monthlySummary: some View {
         let calendar = Calendar.current
-        let completed = trips.filter {
-            !$0.isInProgress && calendar.isDate($0.startDate, equalTo: .now, toGranularity: .month)
+        let business = trips.filter {
+            !$0.isInProgress && $0.classification == .business
+                && calendar.isDate($0.startDate, equalTo: .now, toGranularity: .month)
         }
-        return VStack(alignment: .leading, spacing: 12) {
-            Label("THIS MONTH", systemImage: "road.lanes")
-                .font(.caption.weight(.semibold))
-            Text(Formatters.miles(completed.reduce(0) { $0 + $1.distanceMiles }))
-                .font(.largeTitle.bold().monospacedDigit())
-            Text("\(completed.count) completed trips")
-                .font(.subheadline)
-            if trips.contains(where: \.isInProgress) {
-                Label("Recording your drive", systemImage: "record.circle")
+        let miles = ExportFetcher.totalMiles(business)
+        let estimate = Reimbursement.total(business, rate: rate)
+        let reviewCount = needingReview.count
+        return VStack(alignment: .leading, spacing: 16) {
+            statusHeader
+            VStack(alignment: .leading, spacing: 4) {
+                Text("BUSINESS THIS MONTH")
+                    .font(.caption.weight(.semibold))
+                Text(Formatters.miles(miles))
+                    .font(.largeTitle.bold().monospacedDigit())
+                Text("Estimated reimbursement \(rate.format(estimate))")
+                    .font(.subheadline.monospacedDigit())
+                Text("An estimate at \(rate.label); the amount in your exports is final.")
+                    .font(.caption2)
+                    .opacity(0.8)
+            }
+            if reviewCount > 0 {
+                Button { showingReview = true } label: {
+                    HStack {
+                        Label("\(reviewCount) \(reviewCount == 1 ? "trip needs" : "trips need") review",
+                              systemImage: "tray.full")
+                        Spacer()
+                        Image(systemName: "chevron.right").font(.caption.weight(.semibold))
+                    }
                     .font(.subheadline.weight(.semibold))
+                    .padding(10)
+                    .background(.white.opacity(0.18), in: RoundedRectangle(cornerRadius: 10))
+                }
+                .buttonStyle(.plain)
             }
         }
         .foregroundStyle(.white)
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(20)
         .background(AppTheme.summaryGradient, in: RoundedRectangle(cornerRadius: 20))
+    }
+
+    private var statusHeader: some View {
+        let status = status
+        let content = HStack(alignment: .top, spacing: 10) {
+            Image(systemName: status.systemImage)
+                .font(.title3)
+                .foregroundStyle(statusTint(status))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(status.title).font(.headline)
+                Text(status.explanation).font(.caption)
+            }
+            Spacer(minLength: 0)
+            if case .actionNeeded = status {
+                Image(systemName: "chevron.right").font(.caption.weight(.semibold))
+            }
+        }
+        .padding(10)
+        .background(.white.opacity(0.18), in: RoundedRectangle(cornerRadius: 10))
         .accessibilityElement(children: .combine)
+        return Group {
+            if case .actionNeeded = status {
+                Button(action: statusAction) { content }.buttonStyle(.plain)
+            } else {
+                content
+            }
+        }
+    }
+
+    private func statusTint(_ status: RecordingStatus) -> Color {
+        switch status {
+        case .ready: .white
+        case .recording: AppTheme.gold
+        case .actionNeeded: .orange
+        }
+    }
+
+    private func classify(_ trip: Trip, as classification: TripClassification) {
+        trip.classification = classification
+        try? modelContext.save()
     }
 
     private func delete(_ trips: [Trip]) {
