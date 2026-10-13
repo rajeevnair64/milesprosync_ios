@@ -38,7 +38,7 @@ struct ReimbursementSection: View {
 
             switch mode {
             case .irs:
-                LabeledContent("\(Calendar.current.component(.year, from: .now)) taxation rate",
+                LabeledContent("\(String(Calendar.current.component(.year, from: .now))) taxation rate",
                                value: "\(symbol)\(AppSettings.formatRate(IRSRates.rate(on: .now)))/mi")
             case .custom:
                 field("Rate (\(symbol)/mi)", text: $rateText, placeholder: "Rate")
