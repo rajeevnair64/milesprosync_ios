@@ -25,7 +25,7 @@ struct AccountTypeView: View {
                 Text("How will you use Miles Pro Sync?")
             } footer: {
                 Text(canChange
-                     ? "Two months are free either way. You use it as one or the other, not both."
+                     ? "The first day is free either way. You use it as one or the other, not both."
                      : "Your plan decides this. To switch, let your current plan end first.")
             }
         }

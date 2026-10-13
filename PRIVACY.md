@@ -10,7 +10,7 @@ This policy explains what information MilesProSync (the "app") collects, how it 
 - You do not need an account to use the app. Your trips, saved places, trip purposes and settings are stored on your device.
 - Website Sync is optional. Only if you turn it on by signing in with Apple are your trips (including their GPS routes) uploaded to our cloud database, so you can view them on the MilesProSync website.
 - When you delete a trip, it is hidden from you but kept as a record on your device and in our cloud database.
-- Subscriptions and the one-time five-year purchase are bought through Apple's in-app purchase. New users get two free months; after that the app needs a subscription or the five-year purchase to record new drives.
+- Subscriptions and the one-time five-year purchase are bought through Apple's in-app purchase. New users get a one-day free trial; after that the app needs a subscription or the five-year purchase to record new drives.
 - Teams are optional. If you join one, only your **Business** trips that end while you are a member are shown to the team. Personal and unclassified trips are never shown to it.
 - We do not sell your data, show ads, use third-party analytics, or track you across other companies' apps and websites.
 
@@ -80,7 +80,7 @@ Route drawings on the website are made in your browser from your own trip data; 
 
 ### Subscriptions
 
-Subscriptions are bought and managed through Apple (in-app purchase), and Apple handles your payment details; we never receive your card or payment information. The app keeps the date you first used it, the expiry date of your current subscription, and, if you bought the five-year purchase, the date you bought it and the features it covers, on your device, to decide whether new drives and newer features are available. The first-use date is kept in the iOS Keychain, which survives removing the app, so reinstalling doesn't restart the two free months. The app also asks the App Store (through StoreKit) for the date your Apple ID first got the app, and uses it if it is earlier, so the two free months don't restart on a new device either. Apple provides that date; it is not sent to us.
+Subscriptions are bought and managed through Apple (in-app purchase), and Apple handles your payment details; we never receive your card or payment information. The app keeps the date you first used it, the expiry date of your current subscription, and, if you bought the five-year purchase, the date you bought it and the features it covers, on your device, to decide whether new drives and newer features are available. The first-use date is kept in the iOS Keychain, which survives removing the app, so reinstalling doesn't restart the free trial. The app also asks the App Store (through StoreKit) for the date your Apple ID first got the app, and uses it if it is earlier, so the free trial doesn't restart on a new device either. Apple provides that date; it is not sent to us.
 
 If you subscribe to a Team plan, the app also sends Apple's signed receipt for that subscription to our server, together with your account, so the server can confirm the subscription is active. We store the product, the expiry date, and the original transaction identifier, until you delete your website account.
 

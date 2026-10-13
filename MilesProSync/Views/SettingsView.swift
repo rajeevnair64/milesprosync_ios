@@ -35,9 +35,9 @@ struct SettingsView: View {
                 } footer: {
                     switch subscriptions?.accountType {
                     case .individual:
-                        Text("Two months free, then $39.99 per year, $4.99 per month, or $109.99 once for 5 years (one person only).")
+                        Text("One day free, then $39.99 per year, $4.99 per month, or $109.99 once for 5 years (one person only).")
                     case .team:
-                        Text("Two months free, then $3.99 per user per month or $34.99 per user per year.")
+                        Text("One day free, then $3.99 per user per month or $34.99 per user per year.")
                     case nil:
                         Text("Choose how you use Miles Pro Sync: on your own, or as part of a team.")
                     }

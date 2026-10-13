@@ -2,7 +2,7 @@ import Foundation
 
 /// The subscriptions, all in one App Store subscription group so a person has at most one.
 enum ProductID {
-    /// Single user, not on a team: $4.99/month after the two free months.
+    /// Single user, not on a team: $4.99/month after the one-day free trial.
     static let individual = "com.aisleweb.MilesProSync.individual.monthly"
     /// The same plan billed yearly: $39.99/year.
     static let individualAnnual = "com.aisleweb.MilesProSync.individual.annual"
@@ -116,7 +116,7 @@ enum AccountType: String, CaseIterable, Equatable, Sendable {
 }
 
 enum AccessState: Equatable, Sendable {
-    /// The free period for a new user: every feature, two months from first launch.
+    /// The free period for a new user: every feature, one day from first launch.
     case trial(endsAt: Date)
     case subscribed(Plan?)
     /// Bought once: everything for five years from the purchase (`endsAt`), including every
@@ -142,13 +142,13 @@ enum AccessState: Equatable, Sendable {
     }
 }
 
-/// Free for two months, then a subscription. A pure function of its inputs so it can be tested
+/// Free for one day, then a subscription. A pure function of its inputs so it can be tested
 /// and read when iOS relaunches the app in the background.
 enum AccessPolicy {
-    static let trialMonths = 2
+    static let trialDays = 1
 
     static func trialEnd(from start: Date, calendar: Calendar = .current) -> Date {
-        calendar.date(byAdding: .month, value: trialMonths, to: start) ?? start.addingTimeInterval(61 * 86_400)
+        calendar.date(byAdding: .day, value: trialDays, to: start) ?? start.addingTimeInterval(Double(trialDays) * 86_400)
     }
 
     /// How long a pay-once purchase lasts.

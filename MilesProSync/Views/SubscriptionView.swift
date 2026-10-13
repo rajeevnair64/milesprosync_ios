@@ -36,7 +36,7 @@ struct SubscriptionView: View {
                 } header: {
                     Text("Choose a plan")
                 } footer: {
-                    Text("The first two months are free. Subscriptions are charged to your Apple ID at confirmation of purchase and renew each month or year until cancelled at least 24 hours before the end of the current period. Manage or cancel in your Apple ID account settings. The pay-once purchase is charged once, lasts five years from the purchase date, and is restored with Restore Purchases. Switching between subscriptions is handled by the App Store.")
+                    Text("The first day is free. Subscriptions are charged to your Apple ID at confirmation of purchase and renew each month or year until cancelled at least 24 hours before the end of the current period. Manage or cancel in your Apple ID account settings. The pay-once purchase is charged once, lasts five years from the purchase date, and is restored with Restore Purchases. Switching between subscriptions is handled by the App Store.")
                 }
 
                 if case .purchased = subscriptions.state, !subscriptions.lockedFeatures.isEmpty {
