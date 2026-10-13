@@ -1,0 +1,144 @@
+{
+  "identifier": "7C2F4A10",
+  "nonRenewingSubscriptions": [
+    {
+      "displayPrice": "109.99",
+      "familyShareable": false,
+      "internalID": "9BF8570F-5CB6-50CA-95F2-BC5F9FD3DDD6",
+      "localizations": [
+        {
+          "description": "Individual use for five years, no renewals",
+          "displayName": "Five Years, Pay Once",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "com.aisleweb.MilesProSync.individual.fiveyear",
+      "referenceName": "Five Years",
+      "type": "NonRenewingSubscription"
+    }
+  ],
+  "products": [
+    {
+      "displayPrice": "29.99",
+      "familyShareable": false,
+      "internalID": "DA45734F-5513-5F89-A39E-0D182C66B5AE",
+      "localizations": [
+        {
+          "description": "Adds the premium features released since your purchase",
+          "displayName": "Five Year Upgrade",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "com.aisleweb.MilesProSync.individual.fiveyear.upgrade",
+      "referenceName": "Five Year Upgrade",
+      "type": "NonConsumable"
+    }
+  ],
+  "settings": {
+    "_failTransactionsEnabled": false,
+    "_locale": "en_US",
+    "_storefront": "USA",
+    "_storeKitErrors": []
+  },
+  "subscriptionGroups": [
+    {
+      "id": "A1B2C3D4-0000-4000-8000-000000000001",
+      "localizations": [],
+      "name": "MilesProSync Plans",
+      "subscriptions": [
+        {
+          "adHocOffers": [],
+          "codeOffers": [],
+          "displayPrice": "4.99",
+          "familyShareable": false,
+          "groupNumber": 1,
+          "internalID": "284F37BC-EBF2-5A39-9859-8313C46F5DE0",
+          "introductoryOffer": null,
+          "localizations": [
+            {
+              "description": "Individual plan, billed monthly",
+              "displayName": "Individual Monthly",
+              "locale": "en_US"
+            }
+          ],
+          "productID": "com.aisleweb.MilesProSync.individual.monthly",
+          "recurringSubscriptionPeriod": "P1M",
+          "referenceName": "Individual Monthly",
+          "subscriptionGroupID": "A1B2C3D4-0000-4000-8000-000000000001",
+          "type": "RecurringSubscription",
+          "winBackOffers": []
+        },
+        {
+          "adHocOffers": [],
+          "codeOffers": [],
+          "displayPrice": "39.99",
+          "familyShareable": false,
+          "groupNumber": 2,
+          "internalID": "27D2E14A-A6F5-5C45-B388-F0DEC21031B2",
+          "introductoryOffer": null,
+          "localizations": [
+            {
+              "description": "Individual plan, billed yearly",
+              "displayName": "Individual Yearly",
+              "locale": "en_US"
+            }
+          ],
+          "productID": "com.aisleweb.MilesProSync.individual.annual",
+          "recurringSubscriptionPeriod": "P1Y",
+          "referenceName": "Individual Yearly",
+          "subscriptionGroupID": "A1B2C3D4-0000-4000-8000-000000000001",
+          "type": "RecurringSubscription",
+          "winBackOffers": []
+        },
+        {
+          "adHocOffers": [],
+          "codeOffers": [],
+          "displayPrice": "3.99",
+          "familyShareable": false,
+          "groupNumber": 3,
+          "internalID": "D1173D6F-5607-5C8A-9DE3-F9F5F0F6186C",
+          "introductoryOffer": null,
+          "localizations": [
+            {
+              "description": "Per-user team plan, billed monthly",
+              "displayName": "Team Monthly",
+              "locale": "en_US"
+            }
+          ],
+          "productID": "com.aisleweb.MilesProSync.team.monthly",
+          "recurringSubscriptionPeriod": "P1M",
+          "referenceName": "Team Monthly",
+          "subscriptionGroupID": "A1B2C3D4-0000-4000-8000-000000000001",
+          "type": "RecurringSubscription",
+          "winBackOffers": []
+        },
+        {
+          "adHocOffers": [],
+          "codeOffers": [],
+          "displayPrice": "34.99",
+          "familyShareable": false,
+          "groupNumber": 4,
+          "internalID": "BB7C73FE-A4DE-5509-A5AE-CCA0D0093BB5",
+          "introductoryOffer": null,
+          "localizations": [
+            {
+              "description": "Per-user team plan, billed yearly",
+              "displayName": "Team Yearly",
+              "locale": "en_US"
+            }
+          ],
+          "productID": "com.aisleweb.MilesProSync.team.annual",
+          "recurringSubscriptionPeriod": "P1Y",
+          "referenceName": "Team Yearly",
+          "subscriptionGroupID": "A1B2C3D4-0000-4000-8000-000000000001",
+          "type": "RecurringSubscription",
+          "winBackOffers": []
+        }
+      ]
+    }
+  ],
+  "version": {
+    "major": 4,
+    "minor": 0
+  }
+}

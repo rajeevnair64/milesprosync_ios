@@ -86,6 +86,8 @@ schemes:
         MilesProSyncTests: [test]
     run:
       config: Debug
+      # Local purchases for testing plans and expiry; used by Run only, never by Archive.
+      storeKitConfiguration: MilesProSync.storekit
     test:
       config: Debug
       targets:
