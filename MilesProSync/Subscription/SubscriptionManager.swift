@@ -75,11 +75,16 @@ final class SubscriptionManager {
         do {
             let loaded = try await Product.products(for: ProductID.store)
             products = loaded.sorted { $0.price > $1.price }
-            errorMessage = loaded.isEmpty
-                ? "Plans aren't available from the App Store right now. Try again in a moment."
-                : nil
+            let missing = ProductID.store.filter { id in !loaded.contains { $0.id == id } }
+            errorMessage = if loaded.isEmpty {
+                "Plans aren't available from the App Store right now. Try again in a moment.\n\nApp Store returned 0 of \(ProductID.store.count) products. Missing: \(missing.joined(separator: ", "))"
+            } else if !missing.isEmpty {
+                "Some plans aren't available from the App Store.\n\nReturned: \(loaded.map(\.id).sorted().joined(separator: ", "))\nMissing: \(missing.joined(separator: ", "))"
+            } else {
+                nil
+            }
         } catch {
-            errorMessage = "Couldn't load subscription options. Check your connection and try again."
+            errorMessage = "Couldn't load subscription options. Check your connection and try again.\n\n\(error.localizedDescription)"
         }
     }
 
