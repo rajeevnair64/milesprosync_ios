@@ -67,9 +67,13 @@ final class DriveDetectionService {
     func finishCurrentTrip() {
         enqueue {
             guard !self.isStopped else { return }
-            let actions = self.machine.finishManually(
-                currentLocation: self.locationManager.location, now: Date()
-            )
+            var current = self.locationManager.location
+            if current == nil, self.currentTripID != nil, let tripID = self.currentTripID,
+               let point = await self.recorder.lastPoint(of: tripID) {
+                // No live fix yet (e.g. just relaunched): end the trip at its last recorded point.
+                current = CLLocation(latitude: point.latitude, longitude: point.longitude)
+            }
+            let actions = self.machine.finishManually(currentLocation: current, now: Date())
             if actions.isEmpty {
                 if self.currentTripID == nil { await self.finishStaleTrips() }
             } else {

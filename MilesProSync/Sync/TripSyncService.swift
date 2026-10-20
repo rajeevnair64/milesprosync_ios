@@ -71,6 +71,8 @@ final class TripSyncService {
     @ObservationIgnored private var accountEpoch = 0
     @ObservationIgnored private var backgroundTask: UIBackgroundTaskIdentifier = .invalid
     @ObservationIgnored private var debouncedSync: Task<Void, Never>?
+    /// The server-side sign-out in flight. A new sign-in waits for it, so it can't revoke the new session.
+    @ObservationIgnored private var signOutTask: Task<Void, Never>?
     @ObservationIgnored private var saveObserver: (any NSObjectProtocol)?
 
     /// Trips carry their full GPS route, so batches stay small to keep each request modest.
@@ -141,6 +143,7 @@ final class TripSyncService {
     func connectWithApple(identityToken: String, nonce: String) async throws {
         guard let client else { return }
         let epoch = accountEpoch
+        await signOutTask?.value
         do {
             let session = try await client.signInWithApple(identityToken: identityToken, nonce: nonce)
             guard epoch == accountEpoch else { return }
@@ -163,7 +166,7 @@ final class TripSyncService {
         accountEpoch += 1
         debouncedSync?.cancel()
         defaults.removeObject(forKey: Self.restoreUserIDKey)
-        Task { await client.signOut() }
+        signOutTask = Task { await client.signOut() }
         signedInEmail = nil
         lastError = nil
         lastSyncedAt = nil
@@ -316,7 +319,7 @@ final class TripSyncService {
         let existing = Set(try context.fetch(FetchDescriptor<Trip>(predicate: #Predicate { ids.contains($0.id) })).map(\.id))
         var added = 0
         for restored in trips where !existing.contains(restored.id) {
-            context.insert(restored.makeTrip())
+            _ = restored.makeTrip(inserting: context)
             added += 1
         }
         try context.save()

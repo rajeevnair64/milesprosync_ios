@@ -1,4 +1,5 @@
 import Foundation
+import SwiftData
 
 /// One GPS fix in a trip's uploaded `route`.
 struct RoutePointPayload: Encodable, Equatable, Sendable {
@@ -162,7 +163,9 @@ struct RestoredTrip: Decodable, Equatable, Sendable {
 
     /// A trip ready to insert: finished, and already in sync with the cloud (it came from there),
     /// so it isn't uploaded again until it is edited.
-    func makeTrip() -> Trip {
+    /// With a `context`, the trip is inserted before its route is attached: SwiftData can crash
+    /// when a relationship is set on a model that isn't in a context yet.
+    func makeTrip(inserting context: ModelContext? = nil) -> Trip {
         let trip = Trip(
             id: id, startDate: startedAt, endDate: endedAt, distanceMiles: distanceMiles,
             startLatitude: startLatitude, startLongitude: startLongitude,
@@ -171,6 +174,7 @@ struct RestoredTrip: Decodable, Equatable, Sendable {
             classification: TripClassification(rawValue: classification) ?? .unclassified,
             isManuallyClassified: isManuallyClassified, notes: notes
         )
+        context?.insert(trip)
         trip.route = route.map {
             RoutePoint(
                 latitude: $0.latitude, longitude: $0.longitude, timestamp: $0.recordedAt,

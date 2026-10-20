@@ -80,7 +80,7 @@ final class Trip {
     /// Sets the notes (blank clears them) and marks the trip for upload.
     func setNotes(_ text: String) {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        let newValue = trimmed.isEmpty ? nil : text
+        let newValue = trimmed.isEmpty ? nil : trimmed
         guard newValue != notes else { return }
         notes = newValue
         revision += 1

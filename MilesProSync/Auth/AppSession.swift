@@ -209,6 +209,11 @@ final class AppSession {
         current?.stop()
         current = nil
         activate(storageKey: appleUserID)
+        guard current != nil else {
+            // Their store wouldn't open: carry on with the device store rather than leave no session.
+            activate(storageKey: account.storageKey)
+            return account
+        }
         return DeviceAccount(storageKey: appleUserID, appleUserID: nil, email: account.email)
     }
 

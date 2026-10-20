@@ -71,7 +71,7 @@ final class SubscriptionManager {
     }
 
     func loadProducts() async {
-        guard products.isEmpty else { return }
+        guard products.count < ProductID.store.count else { return }
         do {
             let loaded = try await Product.products(for: ProductID.store)
             products = loaded.sorted { $0.price > $1.price }

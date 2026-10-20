@@ -38,6 +38,8 @@ actor TripRecorder {
         }
     }
 
+    /// Trips shorter than this (about 16 m) are discarded when they finish.
+    private static let minTripMiles = 0.01
     private let minPointDistanceMeters = 20.0
     private let minPointInterval: TimeInterval = 5
 
@@ -76,14 +78,26 @@ actor TripRecorder {
         saveContext()
     }
 
+    /// Where the trip's last recorded point is, for ending a trip the state machine has no fix for.
+    func lastPoint(of tripID: PersistentIdentifier) -> CLLocationCoordinate2D? {
+        self[tripID, as: Trip.self]?.sortedRoute.last?.coordinate
+    }
+
     /// Finalizes the trip and returns its endpoints so the caller can kick off reverse
     /// geocoding (a network call, done outside this actor).
     @discardableResult
     func finalizeTrip(_ tripID: PersistentIdentifier, endLocation: CLLocation, endedAt: Date) -> TripEndpoints? {
         guard let trip = self[tripID, as: Trip.self] else { return nil }
+        lastPersistedPointByTrip[tripID] = nil
+        // A drive that never went anywhere (a false start) isn't worth a record.
+        if MileageCalculator.distanceMiles(for: trip.route) < Self.minTripMiles {
+            trip.route.forEach { modelContext.delete($0) }
+            modelContext.delete(trip)
+            saveContext()
+            return nil
+        }
         finish(trip, at: endLocation.coordinate, endedAt: endedAt)
         saveContext()
-        lastPersistedPointByTrip[tripID] = nil
         return TripEndpoints(tripID: tripID, start: trip.startCoordinate, end: trip.endCoordinate, startAddress: trip.startAddress)
     }
 
