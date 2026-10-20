@@ -18,6 +18,10 @@ final class SubscriptionManager {
     private(set) var teamTransaction: String?
     /// A plan the subscription will change to at its next renewal (the App Store defers some
     /// switches), and the date it takes over; nil when none is scheduled.
+    /// Temporary: what the App Store listed on the last refresh, shown on the plans screen to
+    /// diagnose a switch that doesn't show up.
+    private(set) var entitlementSummary = ""
+    private(set) var switchSummary = ""
     private(set) var pendingProductID: String?
     private(set) var pendingSwitchDate: Date?
 
@@ -144,12 +148,19 @@ final class SubscriptionManager {
     }
 
     /// Re-reads what the App Store says is in force and updates the cached state.
-    func refresh() async {
+    /// `including` is a purchase that just completed: the entitlement list can lag behind it, so it
+    /// is counted too.
+    func refresh(including purchase: VerificationResult<Transaction>? = nil) async {
         var best: (transaction: Transaction, jws: String)?
         var purchasedAt: Date?
         var upgradedAt: Date?
-        for await result in Transaction.currentEntitlements {
+        var results: [VerificationResult<Transaction>] = []
+        for await result in Transaction.currentEntitlements { results.append(result) }
+        if let purchase { results.append(purchase) }
+        var seen: [String] = []
+        for result in results {
             guard case .verified(let transaction) = result, transaction.revocationDate == nil else { continue }
+            seen.append("\(transaction.productID.split(separator: ".").suffix(2).joined(separator: ".")) until \(transaction.expirationDate?.formatted(date: .omitted, time: .standard) ?? "-")")
             switch transaction.productID {
             case ProductID.fiveYear:
                 // originalPurchaseDate is the same on every device and after a restore. The
@@ -159,7 +170,8 @@ final class SubscriptionManager {
                 upgradedAt = transaction.originalPurchaseDate
             case let id where ProductID.all.contains(id):
                 guard let expires = transaction.expirationDate, expires > .now else { continue }
-                if best == nil || expires > (best?.transaction.expirationDate ?? .distantPast) {
+                // The newest purchase wins: right after a switch the old plan can still be listed.
+                if best == nil || transaction.purchaseDate > (best?.transaction.purchaseDate ?? .distantPast) {
                     best = (transaction, result.jwsRepresentation)
                 }
             default:
@@ -167,6 +179,8 @@ final class SubscriptionManager {
             }
         }
         let plan = best.flatMap { Plan(productID: $0.transaction.productID) }
+        entitlementSummary = "Apple lists: " + (seen.isEmpty ? "nothing" : seen.joined(separator: "; "))
+            + ". Using: " + (best.map { $0.transaction.productID.split(separator: ".").suffix(2).joined(separator: ".") } ?? "none")
         AccessStore.saveSubscription(
             until: best?.transaction.expirationDate, plan: plan, productID: best?.transaction.productID,
             defaults: defaults
@@ -191,8 +205,19 @@ final class SubscriptionManager {
     /// Looks for a switch the App Store has scheduled for the next renewal, so the plans screen
     /// can say so instead of still showing the old plan with no explanation.
     func refreshPendingSwitch() async {
-        guard let groupID = products.compactMap({ $0.subscription?.subscriptionGroupID }).first,
-              let statuses = try? await Product.SubscriptionInfo.status(for: groupID) else { return }
+        guard let groupID = products.compactMap({ $0.subscription?.subscriptionGroupID }).first else {
+            switchSummary = "Switch check: plans not loaded."
+            return
+        }
+        guard let statuses = try? await Product.SubscriptionInfo.status(for: groupID) else {
+            switchSummary = "Switch check: status lookup failed."
+            return
+        }
+        switchSummary = "Switch check: " + (statuses.isEmpty ? "no status" : statuses.map { status in
+            let renewal = status.renewalInfo.unsafePayloadValue
+            let next = renewal.autoRenewPreference?.split(separator: ".").suffix(2).joined(separator: ".") ?? "-"
+            return "\(status.state.localizedDescription), renews as \(next)"
+        }.joined(separator: "; "))
         var pending: (id: String, date: Date)?
         for status in statuses where status.state == .subscribed {
             guard case .verified(let renewal) = status.renewalInfo,
@@ -218,6 +243,6 @@ final class SubscriptionManager {
             return
         }
         await transaction.finish()
-        await refresh()
+        await refresh(including: result)
     }
 }

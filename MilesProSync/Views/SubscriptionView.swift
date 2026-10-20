@@ -81,6 +81,7 @@ struct SubscriptionView: View {
                 Section {
                     Button("Restore Purchases") { Task { await subscriptions.restore() } }
                         .disabled(subscriptions.isWorking)
+                    Text(subscriptions.entitlementSummary + " " + subscriptions.switchSummary).font(.caption2).foregroundStyle(.secondary)
                     Link("Terms of Use", destination: URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!)
                     NavigationLink("Privacy Policy") { PrivacyPolicyView() }
                 }
@@ -233,6 +234,7 @@ struct TeamPlansView: View {
                 Section {
                     Button("Restore Purchases") { Task { await subscriptions.restore() } }
                         .disabled(subscriptions.isWorking)
+                    Text(subscriptions.entitlementSummary + " " + subscriptions.switchSummary).font(.caption2).foregroundStyle(.secondary)
                 }
             }
         }
