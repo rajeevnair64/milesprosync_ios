@@ -47,6 +47,12 @@ struct TeamView: View {
             Section { Text(message).foregroundStyle(.red) }
         }
 
+        if status?.subscription.active == true {
+            Section {
+                NavigationLink("Switch to an individual plan") { SwitchPlanView(target: .individual) }
+            }
+        }
+
         if status?.subscription.active != true {
             Section {
                 Text("Team plans are $3.99 per user per month or $34.99 per user per year, with unlimited trips.")

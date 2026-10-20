@@ -20,6 +20,7 @@ struct SubscriptionView: View {
             if let subscriptions {
                 Section("Your plan") {
                     Text(statusText(subscriptions.state))
+                    PendingSwitchNote()
                     if case .expired = subscriptions.state {
                         Text("Your trips stay on this iPhone and can be exported, but new drives aren't recorded until you subscribe.")
                             .font(.footnote)
@@ -46,6 +47,20 @@ struct SubscriptionView: View {
                     Text("Choose a plan")
                 } footer: {
                     Text("The first day is free. Subscriptions are charged to your Apple ID at confirmation of purchase and renew each month or year until cancelled at least 24 hours before the end of the current period. Manage or cancel in your Apple ID account settings. The pay-once purchase is charged once, lasts five years from the purchase date, and is restored with Restore Purchases. Switching between subscriptions is handled by the App Store.")
+                }
+
+                if case .subscribed = subscriptions.state {
+                    Section {
+                        NavigationLink("Switch to a team plan") { SwitchPlanView(target: .team) }
+                    } footer: {
+                        Text("For people on a team. You can switch back later.")
+                    }
+                } else if case .purchased = subscriptions.state {
+                    Section {
+                        Text("Your pay-once plan can't be switched to a team plan. It runs for its five years.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
                 }
 
                 if case .purchased = subscriptions.state, !subscriptions.lockedFeatures.isEmpty {
@@ -126,6 +141,8 @@ private struct PlanRow: View {
     var badge: String?
     var detail: String?
     var buyLabel = "Subscribe"
+    /// Set on the switch screen, after the person has read what switching means.
+    var confirmedSwitch = false
 
     var body: some View {
         let product = subscriptions?.product(id)
@@ -155,7 +172,7 @@ private struct PlanRow: View {
                         Task {
                             if subscriptions.product(id) == nil { await subscriptions.loadProducts() }
                             if let product = subscriptions.product(id) {
-                                await subscriptions.purchase(product)
+                                await subscriptions.purchase(product, confirmedSwitch: confirmedSwitch)
                             }
                         }
                     }
@@ -184,6 +201,12 @@ struct TeamPlansView: View {
 
     var body: some View {
         List {
+            if let subscriptions, case .subscribed = subscriptions.state {
+                Section {
+                    PendingSwitchNote()
+                    NavigationLink("Switch to an individual plan") { SwitchPlanView(target: .individual) }
+                }
+            }
             if let subscriptions, case .expired = subscriptions.state {
                 Section {
                     Text("Your plan has ended. Your trips stay on this iPhone and can be exported, but new drives aren't recorded until you subscribe.")
@@ -217,5 +240,94 @@ struct TeamPlansView: View {
         .navigationTitle("Team plans")
         .navigationBarTitleDisplayMode(.inline)
         .task { await subscriptions?.loadProducts() }
+    }
+}
+
+/// "Switching to Team yearly on Nov 3." when the App Store has scheduled a plan change.
+private struct PendingSwitchNote: View {
+    @Environment(SubscriptionManager.self) private var subscriptions: SubscriptionManager?
+
+    var body: some View {
+        if let subscriptions, let id = subscriptions.pendingProductID, let date = subscriptions.pendingSwitchDate {
+            let name = subscriptions.product(id)?.displayName ?? "your new plan"
+            Text("Switching to \(name) on \(date.formatted(date: .abbreviated, time: .omitted)). Until then your current plan stays active.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+        }
+    }
+}
+
+/// Moves a subscriber between Individual and Teams. The warning comes first; the plans can be
+/// bought only after it is acknowledged. The App Store, not the app, bills and refunds.
+struct SwitchPlanView: View {
+    let target: AccountType
+    @Environment(SubscriptionManager.self) private var subscriptions: SubscriptionManager?
+    @Environment(\.dismiss) private var dismiss
+    @State private var acknowledged = false
+    @State private var showingManage = false
+    @State private var startingType: AccountType?
+    @State private var startingPending: String?
+
+    var body: some View {
+        List {
+            Section {
+                Text("You're switching to \(target == .team ? "a team" : "an individual") plan.")
+                    .font(.headline)
+                Text("Your current subscription is replaced by the new plan, and the App Store decides when: sometimes right away, sometimes at your next renewal. Apple handles the billing and any credit or refund for the time left on your current plan, and Miles Pro Sync can't refund it. Review the details Apple shows before you confirm.")
+                if target == .individual {
+                    Text("Leaving Teams doesn't remove you from your team. Leave it in Settings → Team if you no longer want to share your Business trips.")
+                }
+                Toggle("I understand", isOn: $acknowledged)
+            } header: {
+                Text("Before you switch")
+            }
+
+            Section {
+                switch target {
+                case .team:
+                    PlanRow(
+                        id: ProductID.teamAnnual, title: "Team yearly", fallbackPrice: "$34.99", per: "/user/year",
+                        confirmedSwitch: true
+                    )
+                    PlanRow(id: ProductID.team, title: "Team monthly", fallbackPrice: "$3.99", per: "/user/month", confirmedSwitch: true)
+                case .individual:
+                    PlanRow(
+                        id: ProductID.individualAnnual, title: "Yearly", fallbackPrice: "$39.99", per: "/year",
+                        confirmedSwitch: true
+                    )
+                    PlanRow(id: ProductID.individual, title: "Monthly", fallbackPrice: "$4.99", per: "/month", confirmedSwitch: true)
+                }
+            } header: {
+                Text("Choose a plan")
+            }
+            .disabled(!acknowledged)
+
+            if let message = subscriptions?.errorMessage {
+                Section { Text(message).foregroundStyle(.red) }
+            }
+
+            Section {
+                Button("Manage Subscriptions") { showingManage = true }
+                Link("Report a Problem or Request a Refund", destination: URL(string: "https://reportaproblem.apple.com")!)
+            } footer: {
+                Text("Cancel or review your subscription with Apple. Refund requests are decided by Apple.")
+            }
+        }
+        .brandedBackground()
+        .navigationTitle("Switch plan")
+        .navigationBarTitleDisplayMode(.inline)
+        .manageSubscriptionsSheet(isPresented: $showingManage)
+        .task {
+            await subscriptions?.loadProducts()
+            startingType = subscriptions?.accountType
+            startingPending = subscriptions?.pendingProductID
+        }
+        // The switch took effect, or was scheduled for the next renewal.
+        .onChange(of: subscriptions?.accountType) { _, new in
+            if let startingType, new != startingType { dismiss() }
+        }
+        .onChange(of: subscriptions?.pendingProductID) { _, new in
+            if new != nil, new != startingPending { dismiss() }
+        }
     }
 }

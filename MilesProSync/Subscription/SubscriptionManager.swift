@@ -16,6 +16,10 @@ final class SubscriptionManager {
     private(set) var errorMessage: String?
     /// The signed Team transaction currently in force, for the website (nil without a Team plan).
     private(set) var teamTransaction: String?
+    /// A plan the subscription will change to at its next renewal (the App Store defers some
+    /// switches), and the date it takes over; nil when none is scheduled.
+    private(set) var pendingProductID: String?
+    private(set) var pendingSwitchDate: Date?
 
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private var updatesTask: Task<Void, Never>?
@@ -83,6 +87,7 @@ final class SubscriptionManager {
             } else {
                 nil
             }
+            await refreshPendingSwitch()
         } catch {
             errorMessage = "Couldn't load subscription options. Check your connection and try again.\n\n\(error.localizedDescription)"
         }
@@ -97,11 +102,14 @@ final class SubscriptionManager {
         return true
     }
 
-    func purchase(_ product: Product) async {
+    /// `confirmedSwitch` is set once the person has read the switch warning; it lets a subscriber
+    /// buy a plan of the other type. The type itself changes only if the purchase succeeds.
+    func purchase(_ product: Product, confirmedSwitch: Bool = false) async {
         errorMessage = nil
         // One or the other: a person on Teams buys per-user plans only, an individual the rest.
         // Buying before choosing chooses.
-        if let message = accountType?.refusal(forPurchasing: product.id) {
+        if let message = accountType?.refusal(forPurchasing: product.id),
+           !(confirmedSwitch && AccountType.canSwitch(in: state)) {
             errorMessage = message
             return
         }
@@ -177,6 +185,25 @@ final class SubscriptionManager {
             AccessStore.saveAccountType(resolved, defaults: defaults)
         }
         accountType = resolved
+        await refreshPendingSwitch()
+    }
+
+    /// Looks for a switch the App Store has scheduled for the next renewal, so the plans screen
+    /// can say so instead of still showing the old plan with no explanation.
+    func refreshPendingSwitch() async {
+        guard let groupID = products.compactMap({ $0.subscription?.subscriptionGroupID }).first,
+              let statuses = try? await Product.SubscriptionInfo.status(for: groupID) else { return }
+        var pending: (id: String, date: Date)?
+        for status in statuses where status.state == .subscribed {
+            guard case .verified(let renewal) = status.renewalInfo,
+                  case .verified(let transaction) = status.transaction,
+                  transaction.revocationDate == nil,
+                  let next = renewal.autoRenewPreference, next != transaction.productID,
+                  let expires = transaction.expirationDate, expires > .now else { continue }
+            pending = (next, expires)
+        }
+        pendingProductID = pending?.id
+        pendingSwitchDate = pending?.date
     }
 
     /// Moves the free period's start back to this Apple ID's first download, if that is earlier.

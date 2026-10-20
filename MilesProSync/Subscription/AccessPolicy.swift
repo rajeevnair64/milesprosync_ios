@@ -106,7 +106,15 @@ enum AccountType: String, CaseIterable, Equatable, Sendable {
         }
     }
 
-    /// The type can be changed only while nothing is paid for; a paid plan pins it.
+    /// A subscriber may move to the other type by subscribing to its plan (the App Store handles the
+    /// billing); a pay-once purchase can't be switched, and runs its five years.
+    static func canSwitch(in state: AccessState) -> Bool {
+        if case .subscribed = state { return true }
+        return canChange(in: state)
+    }
+
+    /// The type can be chosen directly only while nothing is paid for; a paid plan pins it, and
+    /// moving off a subscription goes through `canSwitch` and a purchase.
     static func canChange(in state: AccessState) -> Bool {
         switch state {
         case .trial, .expired: true

@@ -38,6 +38,14 @@ struct AccountTypeTests {
         #expect(!AccountType.canChange(in: .purchased(featuresThrough: later, endsAt: later)))
     }
 
+    @Test func subscribersMaySwitchButPayOnceOwnersMayNot() {
+        #expect(AccountType.canSwitch(in: .trial(endsAt: later)))
+        #expect(AccountType.canSwitch(in: .expired))
+        #expect(AccountType.canSwitch(in: .subscribed(.individual)))
+        #expect(AccountType.canSwitch(in: .subscribed(.team)))
+        #expect(!AccountType.canSwitch(in: .purchased(featuresThrough: later, endsAt: later)))
+    }
+
     @Test func choiceIsStoredAndCleared() {
         let defaults = UserDefaults(suiteName: UUID().uuidString)!
         #expect(AccessStore.storedAccountType(defaults: defaults) == nil)

@@ -26,7 +26,7 @@ struct AccountTypeView: View {
             } footer: {
                 Text(canChange
                      ? "The first day is free either way. You use it as one or the other, not both."
-                     : "Your plan decides this. To switch, let your current plan end first.")
+                     : "Your plan decides this. To switch plan type, use Settings → Subscription (or Team) → Switch plan. A pay-once plan can't be switched.")
             }
         }
         .brandedBackground()
