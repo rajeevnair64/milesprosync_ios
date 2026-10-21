@@ -68,6 +68,8 @@ struct DriveStateMachine {
     /// The latest fix seen while recording, where a manual finish ends the trip if the caller has
     /// no fresher one.
     private var lastRecordingFix: CLLocation?
+    /// The fix before the one being handled, for speeds the system didn't report.
+    private var previousFix: CLLocation?
 
     init(config: Configuration = Configuration()) {
         self.config = config
@@ -111,6 +113,8 @@ struct DriveStateMachine {
 
     mutating func handle(_ location: CLLocation) -> [Action] {
         let speed = max(location.speed, 0)
+        let previous = previousFix
+        previousFix = location
 
         switch phase {
         case .idle:
@@ -154,6 +158,7 @@ struct DriveStateMachine {
             return []
 
         case .recording:
+            let speed = movementSpeed(of: location, since: previous)
             lastRecordingFix = location
             // Poor or stationary fixes still drive stop detection (a parking garage has weak
             // GPS), they just aren't added to the route.
@@ -170,6 +175,7 @@ struct DriveStateMachine {
             return []
 
         case .candidateStopped:
+            let speed = movementSpeed(of: location, since: previous)
             lastRecordingFix = location
             if speed >= config.movingSpeed {
                 // Resumed driving (e.g. was just a red light) — back to recording.
@@ -186,6 +192,21 @@ struct DriveStateMachine {
             }
             return []
         }
+    }
+
+    /// The fix's speed, or, when the system reports none (-1, common between updates), the speed
+    /// implied by how far the car moved since the last fix. Without it those fixes read as
+    /// stopped and are left out of the route, which then crosses the gap in a straight line.
+    /// Movement counts only when it exceeds both fixes' accuracy, so GPS wander at a standstill
+    /// isn't mistaken for driving.
+    private func movementSpeed(of location: CLLocation, since previous: CLLocation?) -> Double {
+        if location.speed >= 0 { return location.speed }
+        guard let previous, isRouteQuality(location), isRouteQuality(previous) else { return 0 }
+        let seconds = location.timestamp.timeIntervalSince(previous.timestamp)
+        let meters = location.distance(from: previous)
+        guard seconds > 0, seconds <= 30,
+              meters > location.horizontalAccuracy + previous.horizontalAccuracy else { return 0 }
+        return meters / seconds
     }
 
     private func isRouteQuality(_ location: CLLocation) -> Bool {

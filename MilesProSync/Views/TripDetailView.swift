@@ -22,9 +22,15 @@ struct TripDetailView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 Map(position: $cameraPosition) {
-                    if trip.routeCoordinates.count > 1 {
-                        MapPolyline(coordinates: trip.routeCoordinates)
-                            .stroke(AppTheme.blue, style: StrokeStyle(lineWidth: 4, lineCap: .round, lineJoin: .round))
+                    // Stretches that weren't recorded are dashed, so a straight line isn't read as the path taken.
+                    ForEach(Array(trip.routeSegments.enumerated()), id: \.offset) { _, segment in
+                        MapPolyline(coordinates: segment.coordinates)
+                            .stroke(
+                                segment.isGap ? AppTheme.blue.opacity(0.5) : AppTheme.blue,
+                                style: segment.isGap
+                                    ? StrokeStyle(lineWidth: 3, lineCap: .butt, dash: [6, 8])
+                                    : StrokeStyle(lineWidth: 4, lineCap: .round, lineJoin: .round)
+                            )
                     }
                     Marker("Start", systemImage: "circle.fill", coordinate: trip.startCoordinate)
                         .tint(AppTheme.teal)

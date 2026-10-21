@@ -312,4 +312,54 @@ struct DriveStateMachineTests {
         #expect(machine.regionExited(at: nil, now: t0) == [.startContinuousUpdates])
         #expect(machine.regionExited(at: nil, now: t0).isEmpty)
     }
+
+    // MARK: - Fixes without a reported speed
+
+    @Test func movementWithoutAReportedSpeedStillExtendsTheRoute() {
+        var machine = DriveStateMachine()
+        _ = startRecording(&machine)
+        // Speed -1, but 24 m north in 2 s (12 m/s), well beyond the fixes' 5 m accuracy.
+        let lastMetersNorth = 60.0 * 12
+        let moved = fix(62, speed: -1, metersNorth: lastMetersNorth + 24)
+        #expect(machine.handle(moved) == [.appendPoint(moved)])
+    }
+
+    @Test func wanderWithoutAReportedSpeedIsNotMovement() {
+        var machine = DriveStateMachine()
+        _ = startRecording(&machine)
+        let lastMetersNorth = 60.0 * 12
+        // 6 m in 2 s is inside the combined 10 m accuracy of the two fixes.
+        #expect(machine.handle(fix(62, speed: -1, metersNorth: lastMetersNorth + 6)).isEmpty)
+    }
+}
+
+struct RouteSegmentTests {
+    private func coordinate(metersNorth: Double) -> CLLocationCoordinate2D {
+        CLLocationCoordinate2D(latitude: 37.0 + metersNorth / 111_000, longitude: -122.0)
+    }
+
+    @Test func aContinuousRouteIsOneRecordedSegment() {
+        let points = [0.0, 50, 100, 150].map(coordinate(metersNorth:))
+        let segments = Trip.segments(of: points)
+        #expect(segments.count == 1)
+        #expect(segments[0].isGap == false)
+        #expect(segments[0].coordinates.count == 4)
+    }
+
+    @Test func aLongJumpBecomesAGapBetweenTwoRecordedStretches() {
+        let points = [0.0, 50, 100, 1_000, 1_050].map(coordinate(metersNorth:))
+        let segments = Trip.segments(of: points)
+        #expect(segments.map(\.isGap) == [false, true, false])
+        #expect(segments[1].coordinates.count == 2)
+    }
+
+    @Test func aJumpAtTheStartIsAGapFollowedByTheRecordedRoute() {
+        let points = [0.0, 900, 950, 1_000].map(coordinate(metersNorth:))
+        #expect(Trip.segments(of: points).map(\.isGap) == [true, false])
+    }
+
+    @Test func fewerThanTwoPointsHaveNoSegments() {
+        #expect(Trip.segments(of: []).isEmpty)
+        #expect(Trip.segments(of: [coordinate(metersNorth: 0)]).isEmpty)
+    }
 }

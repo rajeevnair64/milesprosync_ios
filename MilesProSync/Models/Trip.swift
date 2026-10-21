@@ -131,6 +131,42 @@ final class Trip {
         route.sorted { $0.timestamp < $1.timestamp }
     }
 
+    /// Consecutive recorded points farther apart than this weren't recorded between (a GPS dropout,
+    /// or the car's parked spot before the drive was confirmed), so the line joining them is a guess.
+    static let routeGapMeters = 400.0
+
+    struct RouteSegment {
+        let coordinates: [CLLocationCoordinate2D]
+        /// True for the straight line over a stretch that wasn't recorded.
+        let isGap: Bool
+    }
+
+    /// The route split into recorded stretches and the unrecorded gaps between them, so the map
+    /// can draw gaps differently instead of presenting a straight line as the path taken.
+    var routeSegments: [RouteSegment] {
+        Self.segments(of: routeCoordinates)
+    }
+
+    static func segments(of coordinates: [CLLocationCoordinate2D], gapMeters: Double = routeGapMeters) -> [RouteSegment] {
+        guard coordinates.count > 1 else { return [] }
+        var segments: [RouteSegment] = []
+        var run = [coordinates[0]]
+        for next in coordinates.dropFirst() {
+            let last = run[run.count - 1]
+            let distance = CLLocation(latitude: last.latitude, longitude: last.longitude)
+                .distance(from: CLLocation(latitude: next.latitude, longitude: next.longitude))
+            if distance > gapMeters {
+                if run.count > 1 { segments.append(RouteSegment(coordinates: run, isGap: false)) }
+                segments.append(RouteSegment(coordinates: [last, next], isGap: true))
+                run = [next]
+            } else {
+                run.append(next)
+            }
+        }
+        if run.count > 1 { segments.append(RouteSegment(coordinates: run, isGap: false)) }
+        return segments
+    }
+
     var routeCoordinates: [CLLocationCoordinate2D] {
         sortedRoute.map(\.coordinate)
     }
