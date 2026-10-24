@@ -90,15 +90,24 @@ actor TripRecorder {
         guard let trip = self[tripID, as: Trip.self] else { return nil }
         lastPersistedPointByTrip[tripID] = nil
         // A drive that never went anywhere (a false start) isn't worth a record.
-        if MileageCalculator.distanceMiles(for: trip.route) < Self.minTripMiles {
-            trip.route.forEach { modelContext.delete($0) }
-            modelContext.delete(trip)
+        if wentNowhere(trip) {
+            discard(trip)
             saveContext()
             return nil
         }
         finish(trip, at: endLocation.coordinate, endedAt: endedAt)
         saveContext()
         return TripEndpoints(tripID: tripID, start: trip.startCoordinate, end: trip.endCoordinate, startAddress: trip.startAddress)
+    }
+
+    private func wentNowhere(_ trip: Trip) -> Bool {
+        MileageCalculator.distanceMiles(for: trip.route) < Self.minTripMiles
+    }
+
+    /// Removes a trip and its route points (deleted explicitly, as SwiftData's cascade isn't relied on).
+    private func discard(_ trip: Trip) {
+        trip.route.forEach { modelContext.delete($0) }
+        modelContext.delete(trip)
     }
 
     private func finish(_ trip: Trip, at end: CLLocationCoordinate2D, endedAt: Date) {
@@ -146,6 +155,11 @@ actor TripRecorder {
             let lastActivityAt = lastPoint?.timestamp ?? trip.startDate
             if index == 0, now.timeIntervalSince(lastActivityAt) <= resumeWindow {
                 recovery.resume = (trip.persistentModelID, lastActivityAt)
+                continue
+            }
+            // Same rule as `finalizeTrip`: a trip cut off before it went anywhere leaves no record.
+            if wentNowhere(trip) {
+                discard(trip)
                 continue
             }
             finish(trip, at: lastPoint?.coordinate ?? trip.startCoordinate, endedAt: lastActivityAt)

@@ -57,6 +57,17 @@ struct TripRecoveryTests {
         #expect(try trip(id).isInProgress)
     }
 
+    @Test func interruptedTripThatWentNowhereLeavesNoRecord() async throws {
+        try interruptedTrip(lastPointMinutesAgo: 60, points: 1)
+
+        let recovery = await recorder.recoverInProgressTrips(now: now, resumeWindow: 10 * 60)
+
+        #expect(recovery.resume == nil)
+        #expect(recovery.finished.isEmpty)
+        #expect(try ModelContext(container).fetchCount(FetchDescriptor<Trip>()) == 0)
+        #expect(try ModelContext(container).fetchCount(FetchDescriptor<RoutePoint>()) == 0)
+    }
+
     @Test func longInterruptedTripIsFinishedWhereRecordingStopped() async throws {
         let id = try interruptedTrip(lastPointMinutesAgo: 90)
 
@@ -83,17 +94,6 @@ struct TripRecoveryTests {
         #expect(try trip(newer).isInProgress)
         #expect(try !trip(older).isInProgress)
         #expect(recovery.finished.count == 1)
-    }
-
-    @Test func tripInterruptedRightAfterStartKeepsItsStartPoint() async throws {
-        let id = try interruptedTrip(lastPointMinutesAgo: 60, points: 1)
-
-        _ = await recorder.recoverInProgressTrips(now: now, resumeWindow: 10 * 60)
-
-        let finished = try trip(id)
-        #expect(!finished.isInProgress)
-        #expect(finished.distanceMiles == 0)
-        #expect(finished.endDate == finished.startDate)
     }
 
     @Test func noInterruptedTripsMeansNothingToDo() async {

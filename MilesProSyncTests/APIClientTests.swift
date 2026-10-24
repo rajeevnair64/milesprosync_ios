@@ -147,6 +147,31 @@ struct APIClientTests {
         #expect(await client.session == nil)
     }
 
+    @Test func forbiddenRefreshSignsOut() async {
+        let server = FakeServer()
+        await server.enqueue(403, #"{"message":"Forbidden"}"#)
+        let store = InMemoryTokenStore(SyncFixtures.session(expiresIn: 0))
+        let client = APIClient(config: SyncFixtures.config, tokenStore: store, transport: server.transport)
+
+        await #expect(throws: SyncError.sessionExpired) {
+            try await client.upsertTrips([payload()])
+        }
+        #expect(store.load() == nil)
+    }
+
+    @Test(arguments: [404, 413, 502])
+    func aProxyOrServerErrorOnRefreshKeepsSession(status: Int) async {
+        let server = FakeServer()
+        await server.enqueue(status, #"{"message":"Something else went wrong"}"#)
+        let store = InMemoryTokenStore(SyncFixtures.session(expiresIn: 0))
+        let client = APIClient(config: SyncFixtures.config, tokenStore: store, transport: server.transport)
+
+        await #expect(throws: SyncError.server(status: status, message: "Something else went wrong")) {
+            try await client.upsertTrips([payload()])
+        }
+        #expect(store.load() != nil)
+    }
+
     @Test func rateLimitedRefreshKeepsSession() async {
         let server = FakeServer()
         await server.enqueue(429, #"{"message":"Too many requests right now."}"#)

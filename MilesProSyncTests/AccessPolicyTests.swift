@@ -13,20 +13,21 @@ struct AccessPolicyTests {
         calendar.date(from: DateComponents(timeZone: TimeZone(identifier: "UTC"), year: y, month: m, day: d))!
     }
 
-    @Test func newUsersGetOneFreeDay() {
+    @Test func newUsersGetThirtyFreeDays() {
         let start = date(2026, 1, 15)
         let during = AccessPolicy.state(
             trialStart: start, subscribedUntil: nil, plan: nil,
-            now: start.addingTimeInterval(3_600), calendar: calendar
+            now: date(2026, 2, 13), calendar: calendar
         )
-        #expect(AccessPolicy.trialEnd(from: start, calendar: calendar) == date(2026, 1, 16))
-        #expect(during == .trial(endsAt: date(2026, 1, 16)))
+        #expect(AccessPolicy.trialDays == 30)
+        #expect(AccessPolicy.trialEnd(from: start, calendar: calendar) == date(2026, 2, 14))
+        #expect(during == .trial(endsAt: date(2026, 2, 14)))
         #expect(during.allowsRecording)
     }
 
     @Test func recordingStopsAfterTheFreePeriodWithoutASubscription() {
         let state = AccessPolicy.state(
-            trialStart: date(2026, 1, 15), subscribedUntil: nil, plan: nil, now: date(2026, 1, 16), calendar: calendar
+            trialStart: date(2026, 1, 15), subscribedUntil: nil, plan: nil, now: date(2026, 2, 14), calendar: calendar
         )
         #expect(state == .expired)
         #expect(!state.allowsRecording)

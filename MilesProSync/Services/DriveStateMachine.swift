@@ -128,6 +128,9 @@ struct DriveStateMachine {
             return [.startContinuousUpdates]
 
         case .candidateDriving:
+            // iOS often reports no speed (-1) between updates; use the speed implied by the distance moved,
+            // as recording does, so those fixes count towards confirming a drive instead of being ignored.
+            let speed = movementSpeed(of: location, since: previous)
             let isMoving = speed >= config.movingSpeed && isRouteQuality(location)
             if !isMoving, let last = candidatePoints.last,
                location.timestamp.timeIntervalSince(last.timestamp) >= config.stopGraceDuration {

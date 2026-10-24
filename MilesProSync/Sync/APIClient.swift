@@ -61,6 +61,9 @@ actor APIClient {
     /// its request was in flight (the user signed out) must not write its result back.
     private var sessionGeneration = 0
 
+    /// The statuses with which the server says a refresh token is no good (bad request, unauthorized, forbidden).
+    private static let refreshRejectedStatuses: Set<Int> = [400, 401, 403]
+
     /// Refresh this long before expiry so a request never goes out with a token that lapses in flight.
     private let refreshLeeway: TimeInterval = 60
 
@@ -246,9 +249,10 @@ actor APIClient {
                 "POST", path: "auth/refresh",
                 body: ["refresh_token": current.refreshToken]
             ))
-        } catch SyncError.server(let status, _) where (400..<500).contains(status) && status != 429 && status != 408 {
-            // Refresh token revoked or already used — only a fresh sign-in can recover. (429 is only
-            // the server's request limit and 408 a timeout: stay signed in and try again later.)
+        } catch SyncError.server(let status, _) where Self.refreshRejectedStatuses.contains(status) {
+            // Refresh token revoked or already used — only a fresh sign-in can recover. Any other
+            // failure (a proxy's 413 or 404, a 429 request limit, a 408 timeout, a 5xx) says nothing about
+            // the token: stay signed in and try again later.
             if generation == sessionGeneration { store(nil) }
             throw SyncError.sessionExpired
         }

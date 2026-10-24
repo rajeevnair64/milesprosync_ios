@@ -67,6 +67,21 @@ struct DriveStateMachineTests {
         #expect(points.count >= 10)
     }
 
+    @Test func driveWithNoReportedSpeedStillConfirms() {
+        // iOS often reports no speed (-1) at all; the speed implied by the distance moved confirms the drive.
+        var machine = DriveStateMachine()
+        _ = machine.handle(fix(0, speed: -1))
+        var actions: [DriveStateMachine.Action] = []
+        for second in stride(from: 5.0, through: 60, by: 5) {
+            actions += machine.handle(fix(second, speed: -1, metersNorth: second * 12))
+        }
+        #expect(machine.phase == .recording)
+        guard case .beginTrip = actions.first else {
+            Issue.record("expected beginTrip, got \(actions)")
+            return
+        }
+    }
+
     @Test func briefSlowSampleDuringCandidateDoesNotAbort() {
         var machine = DriveStateMachine()
         _ = machine.handle(fix(0, speed: -1))

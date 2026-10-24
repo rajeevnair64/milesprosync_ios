@@ -141,6 +141,36 @@ struct TripSyncServiceTests {
         #expect(service.pendingCount == 0)
     }
 
+    @Test func requestsAreLimitedBySizeAsWellAsByCount() {
+        let sizes = [3, 3, 3, 10, 1, 1]
+        let batches = UploadBatching.batches(sizes, size: { $0 }, maxTrips: 10, maxBytes: 6)
+        // A trip bigger than the limit goes alone; the order is kept.
+        #expect(batches == [[3, 3], [3], [10], [1, 1]])
+        #expect(UploadBatching.batches(Array(0..<25), size: { _ in 1 }, maxTrips: 10, maxBytes: 100).map(\.count) == [10, 10, 5])
+        #expect(UploadBatching.batches([Int](), size: { $0 }).isEmpty)
+    }
+
+    @Test func estimatedSizeCoversTheEncodedSize() throws {
+        let context = ModelContext(container)
+        let trip = Trip(
+            startDate: .now, endDate: .now, distanceMiles: 20,
+            startLatitude: 41.8781136, startLongitude: -87.6297982, endLatitude: 41.9, endLongitude: -87.7,
+            startAddress: "233 S Wacker Dr, Chicago, IL 60606", endAddress: "1 Main St, Oak Park, IL 60301"
+        )
+        context.insert(trip)
+        trip.route = (0..<500).map { index in
+            RoutePoint(
+                latitude: 41.878113600000004 + Double(index) * 0.00001, longitude: -87.62979819999999,
+                timestamp: Date(timeIntervalSince1970: 1_700_000_000 + Double(index)), speed: 13.41, horizontalAccuracy: 5
+            )
+        }
+        let payload = TripPayload(trip: trip)
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+
+        #expect(payload.estimatedBytes >= (try encoder.encode(payload)).count)
+    }
+
     @Test func deletedTripUploadsWithDeletionTime() async throws {
         await server.enqueueOK(2)
         let id = try insertTrip()

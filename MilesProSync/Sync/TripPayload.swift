@@ -65,6 +65,13 @@ struct TripPayload: Encodable, Equatable, Sendable {
         deletedAt = trip.deletedAt
     }
 
+    /// A generous guess at the JSON size, to keep each upload request a sensible size. A route point
+    /// encodes to about 140 bytes; the rest is addresses, notes and field names.
+    var estimatedBytes: Int {
+        let text = (startAddress?.utf8.count ?? 0) + (endAddress?.utf8.count ?? 0) + (notes?.utf8.count ?? 0) + (purpose?.utf8.count ?? 0)
+        return 800 + text * 2 + route.count * 160
+    }
+
     private enum CodingKeys: String, CodingKey {
         case id
         case startedAt = "started_at"
@@ -104,6 +111,36 @@ struct TripPayload: Encodable, Equatable, Sendable {
         try container.encode(purpose, forKey: .purpose)
         try container.encode(route, forKey: .route)
         try container.encode(deletedAt, forKey: .deletedAt)
+    }
+}
+
+/// Groups trips into upload requests. A trip carries its whole GPS route, so a long drive is large;
+/// requests are limited by size as well as by count. A trip bigger than the size limit goes alone
+/// (the website accepts up to 20,000 points for a trip), and trips keep their order.
+enum UploadBatching {
+    /// The website takes up to 50 trips a request; fewer keeps a failed request cheap to repeat.
+    static let maxTrips = 10
+    /// Well inside what the website and the proxy in front of it accept for the sync API.
+    static let maxBytes = 4 * 1024 * 1024
+
+    static func batches<Item>(
+        _ items: [Item], size: (Item) -> Int, maxTrips: Int = maxTrips, maxBytes: Int = maxBytes
+    ) -> [[Item]] {
+        var batches: [[Item]] = []
+        var current: [Item] = []
+        var currentBytes = 0
+        for item in items {
+            let bytes = size(item)
+            if !current.isEmpty, current.count >= maxTrips || currentBytes + bytes > maxBytes {
+                batches.append(current)
+                current = []
+                currentBytes = 0
+            }
+            current.append(item)
+            currentBytes += bytes
+        }
+        if !current.isEmpty { batches.append(current) }
+        return batches
     }
 }
 

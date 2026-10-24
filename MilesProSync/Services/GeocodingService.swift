@@ -64,20 +64,44 @@ struct AddressCandidate: Sendable {
 /// Wraps CLGeocoder with a simple in-memory cache, since reverse geocoding is rate-limited
 /// and trip start/end coordinates repeat often (home, work, regular stops).
 actor GeocodingService {
-    static let shared = GeocodingService()
+    /// Apple allows about 50 reverse-geocoding requests a minute; spacing real lookups by this much
+    /// keeps a launch that fills in many trips' addresses (each can take several lookups) under it.
+    static let systemLookupInterval: Duration = .milliseconds(1300)
+    static let shared = GeocodingService(minimumInterval: systemLookupInterval)
 
     typealias Lookup = @Sendable (CLLocation) async -> AddressCandidate?
 
     private var cache: [String: String] = [:]
     private let lookup: Lookup
+    /// Least time between two lookups; `.zero` (the default, for tests) means no spacing.
+    private let minimumInterval: Duration
+    /// When the latest lookup was (or is) due to start. Reserved before waiting, so lookups that
+    /// interleave at an `await` still keep their spacing.
+    private var nextLookupAt: ContinuousClock.Instant?
 
     /// Distances (meters) at which neighbouring points are tried when the exact point has no house
     /// number, nearest ring first.
     static let probeRadii: [CLLocationDistance] = [25, 60]
     private static let probeBearings: [Double] = [0, 90, 180, 270]
 
-    init(lookup: @escaping Lookup = GeocodingService.systemLookup) {
+    /// After this many probes in a row find nothing, the neighbours aren't tried further: the
+    /// geocoder is rate-limiting or offline, and more requests would only make it worse.
+    private static let probeFailureLimit = 3
+
+    init(lookup: @escaping Lookup = GeocodingService.systemLookup, minimumInterval: Duration = .zero) {
         self.lookup = lookup
+        self.minimumInterval = minimumInterval
+    }
+
+    /// One lookup, started no sooner than `minimumInterval` after the previous one.
+    private func pacedLookup(_ location: CLLocation) async -> AddressCandidate? {
+        if minimumInterval > .zero {
+            let now = ContinuousClock.now
+            let start = max(now, nextLookupAt ?? now)
+            nextLookupAt = start + minimumInterval
+            if start > now { try? await Task.sleep(until: start, clock: .continuous) }
+        }
+        return await lookup(location)
     }
 
     /// The full street address at the point; when the point itself has no house number, the
@@ -87,7 +111,7 @@ actor GeocodingService {
         if let cached = cache[key] { return cached }
 
         let origin = CLLocation(latitude: latitude, longitude: longitude)
-        guard let exact = await lookup(origin) else { return nil }
+        guard let exact = await pacedLookup(origin) else { return nil }
 
         var best = exact.parts
         if !exact.parts.hasHouseNumber, let nearest = await nearestNumberedAddress(to: origin) {
@@ -106,12 +130,18 @@ actor GeocodingService {
     /// Looks up points around `origin`, ring by ring, and returns the closest result that has a
     /// house number. Sequential on purpose: reverse geocoding is rate-limited.
     private func nearestNumberedAddress(to origin: CLLocation) async -> AddressParts? {
+        var failuresInARow = 0
         for radius in Self.probeRadii {
             var best: (parts: AddressParts, distance: CLLocationDistance)?
             for bearing in Self.probeBearings {
                 let probe = Self.offset(origin.coordinate, meters: radius, bearingDegrees: bearing)
-                guard let candidate = await lookup(CLLocation(latitude: probe.latitude, longitude: probe.longitude)),
-                      candidate.parts.hasHouseNumber else { continue }
+                guard let candidate = await pacedLookup(CLLocation(latitude: probe.latitude, longitude: probe.longitude)) else {
+                    failuresInARow += 1
+                    if failuresInARow >= Self.probeFailureLimit { return nil }
+                    continue
+                }
+                failuresInARow = 0
+                guard candidate.parts.hasHouseNumber else { continue }
                 let distance = candidate.location?.distance(from: origin) ?? radius
                 if best == nil || distance < best!.distance {
                     best = (candidate.parts, distance)
