@@ -12,7 +12,7 @@ This policy explains what information MilesProSync (the "app") collects, how it 
 - When you delete a trip, it is hidden from you but kept as a record on your device and in our cloud database.
 - Subscriptions and the one-time five-year purchase are bought through Apple's in-app purchase. New users get a one-day free trial; after that the app needs a subscription or the five-year purchase to record new drives.
 - Teams are optional. If you join one, only your **Business** trips that end while you are a member are shown to the team. Personal and unclassified trips are never shown to it.
-- We do not sell your data, show ads, use third-party analytics, or track you across other companies' apps and websites.
+- We do not sell your data, show ads, or track you across other companies' apps and websites. The app has no analytics; the website uses analytics only if you allow it on its cookie banner.
 
 ## Information we collect
 
@@ -95,6 +95,17 @@ You can join a team with an invite code from the team's admin. Joining needs Web
 - You can leave a team at any time in the app (Settings → Team → Leave Team), which ends the team's access to your trips immediately. Deleting your website account also removes you from the team.
 
 Team records (membership, reports, invites and the activity log) are kept for four years from the date they were made, or from the date you left the team, like trip records, and then erased.
+
+## Data summary
+
+This list matches the privacy declaration the app submits to the App Store. Nothing here leaves your device unless you turn on Website Sync (or, for the receipt, subscribe to a Team plan). None of it is used for tracking or advertising; all of it is used only to provide the app's features.
+
+- **Precise location:** GPS points of your drives (trip routes). Linked to you once uploaded by Website Sync.
+- **Email address:** the address from sign-in, or a private relay address. Linked to you.
+- **Physical address:** trip start and end addresses and saved places, typed by you or looked up by the app. Linked to you once uploaded by Website Sync.
+- **User ID:** your sign-in identifier for the app. Linked to you.
+- **Purchase history:** the product, expiry date and transaction identifier of a Team plan. Linked to you.
+- **Other user content:** trip notes, purposes and classifications. Linked to you once uploaded by Website Sync.
 
 ## How we use information
 
