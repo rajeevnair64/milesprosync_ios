@@ -122,6 +122,7 @@ We do not sell or rent your information, and we do not share it with third parti
 - **Apple (Sign in with Apple, only if you turn on Website Sync).** Apple authenticates you and tells us your Apple ID identifier and, if you share it, your email address. Apple's handling of this is described in Apple's privacy policy.
 - **jsDelivr (website only).** The website loads its Bootstrap code and style files from jsDelivr, a public content delivery network, which receives your IP address and browser information when delivering them.
 - **DigitalOcean (Website Sync, only if you turn it on).** Our website server and database, which hold your account and trip records, are hosted by DigitalOcean in the eastern United States. DigitalOcean processes this data on our behalf.
+- **Amazon Web Services (website access logs).** The web server in front of our website and its API keeps an access log of every request, for security, abuse investigation and traffic analysis: the time, the IP address, the page or API address requested, the response status and size, and the browser or app identifier. Cookies and sign-in credentials are never recorded, and secret tokens in addresses are replaced. These logs are stored with Amazon Web Services in the United States.
 
 We may also disclose information if required by law, or to protect the rights and safety of our users or others.
 
@@ -144,6 +145,7 @@ We keep trip records for **four years from the date of each trip** for tax and a
 - **In the cloud** (only if you used Website Sync), every trip record, including deleted trips, is erased four years after the date of the trip. This applies even if you delete your account: deleting your account removes your cloud login and email address, but trip records already uploaded are kept until they reach four years old.
 - **Account information** (your email address and login) and your subscription record are kept until you delete your website account.
 - **Team records** (membership, reports, invites and the activity log) are kept for four years from the date they were made, or from the date you left the team, and then erased.
+- **Web server access logs** (IP address, time and the address requested) are erased automatically after 180 days.
 
 ## Your choices and rights
 
