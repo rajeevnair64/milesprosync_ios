@@ -6,7 +6,7 @@ This policy explains what information MilesProSync (the "app") collects, how it 
 
 ## Summary
 
-- The app records your location while you drive so it can log trips and calculate mileage automatically. Addresses you type (to add a trip or save a place) are looked up by Apple to find their location.
+- The app records your location while you drive so it can log trips and calculate mileage automatically. Addresses you type (to add a trip or save a place) are looked up by the mapping service built into your phone's operating system to find their location.
 - You do not need an account to use the app. Your trips, saved places, trip purposes and settings are stored on your device.
 - Website Sync is optional. Only if you turn it on by signing in with Apple are your trips (including their GPS routes) uploaded to our cloud database, so you can view them on the MilesProSync website.
 - When you delete a trip, it is hidden from you but kept as a record on your device and in our cloud database.
@@ -40,7 +40,7 @@ For each drive, the app creates a trip record containing:
 - an optional purpose you pick for the trip (for example "Client visit"), which is uploaded with the trip if you use Website Sync
 - whether and when you deleted the trip
 
-You can also add a trip yourself, for a drive the app missed, and edit a trip's times, addresses, distance, classification, purpose and notes. A trip you add by hand has no GPS route; it has the addresses you typed, the coordinates Apple finds for them, and the distance you enter.
+You can also add a trip yourself, for a drive the app missed, and edit a trip's times, addresses, distance, classification, purpose and notes. A trip you add by hand has no GPS route; it has the addresses you typed, the coordinates the mapping service finds for them, and the distance you enter.
 
 Trip records are kept for four years from the date of the trip. See "Retention" below.
 
@@ -117,13 +117,13 @@ When you delete a trip, it is removed from your trip list and from exports, and 
 
 We do not sell or rent your information, and we do not share it with third parties for their own purposes. The app relies on these service providers:
 
-- **Apple (address lookup).** When a trip ends, the app sends its start and end coordinates to Apple's geocoding service to look up street addresses. When you add or edit a trip or save a place, the address you type is sent to Apple's geocoding service to find its coordinates. Apple's handling of this data is described in Apple's privacy policy.
-- **Apple (in-app purchase).** Apple processes your subscription payment and tells the app which subscription is active. Apple's handling of this is described in Apple's privacy policy.
-- **Apple (Sign in with Apple, only if you turn on Website Sync).** Apple authenticates you and tells us your Apple ID identifier and, if you share it, your email address. Apple's handling of this is described in Apple's privacy policy.
+- **Address lookup (your phone's mapping service).** When a trip ends, the app sends its start and end coordinates to the mapping service built into your phone's operating system to look up street addresses. When you add or edit a trip or save a place, the address you type is sent to that service to find its coordinates. Its handling of this data is described in the service provider's privacy policy.
+- **In-app purchase (app store).** The app store processes your subscription payment and tells the app which subscription is active. Its handling of this is described in its own privacy policy.
+- **Sign-in provider (only if you turn on Website Sync).** The sign-in provider authenticates you and tells us your account identifier and, if you share it, your email address. Its handling of this is described in its own privacy policy.
 - **jsDelivr (website only).** The website loads its Bootstrap code and style files from jsDelivr, a public content delivery network, which receives your IP address and browser information when delivering them.
-- **Google Analytics (website only, only if you allow it).** If you press "Allow analytics" on the website's cookie banner, Google Analytics counts visits to our public pages (home, help and privacy): the pages viewed, how you arrived, approximate location, device and browser, using cookies named `_ga` and `_ga_*`. It is never used when you are signed in or in the app, and Google's advertising features and Google Signals are turned off. If you choose "Essential only", nothing is loaded from Google. You can change your choice at any time with "Cookie settings" in the website footer.
+- **Web analytics (website only, only if you allow it).** If you press "Allow analytics" on the website's cookie banner, a web analytics service counts visits to our public pages (home, help and privacy): the pages viewed, how you arrived, approximate location, device and browser, using cookies named `_ga` and `_ga_*`. It is never used when you are signed in or in the app, and its advertising features and cross-device signals are turned off. If you choose "Essential only", nothing is loaded from the analytics provider. You can change your choice at any time with "Cookie settings" in the website footer.
 - **Hosting provider (Website Sync, only if you turn it on).** Our website server and database, which hold your account and trip records, are hosted by a cloud hosting provider in the United States. The provider processes this data on our behalf.
-- **Amazon Web Services (website access logs).** The web server in front of our website and its API keeps an access log of every request, for security, abuse investigation and traffic analysis: the time, the IP address, the page or API address requested, the response status and size, and the browser or app identifier. Cookies and sign-in credentials are never recorded, and secret tokens in addresses are replaced. These logs are stored with Amazon Web Services in the United States.
+- **Cloud storage (website access logs).** The web server in front of our website and its API keeps an access log of every request, for security, abuse investigation and traffic analysis: the time, the IP address, the page or API address requested, the response status and size, and the browser or app identifier. Cookies and sign-in credentials are never recorded, and secret tokens in addresses are replaced. These logs are stored with a cloud storage provider in the United States.
 
 We may also disclose information if required by law, or to protect the rights and safety of our users or others.
 
@@ -147,7 +147,7 @@ We keep trip records for **four years from the date of each trip** for tax and a
 - **Account information** (your email address and login) and your subscription record are kept until you delete your website account.
 - **Team records** (membership, reports, invites and the activity log) are kept for four years from the date they were made, or from the date you left the team, and then erased.
 - **Web server access logs** (IP address, time and the address requested) are erased automatically after 180 days.
-- **Google Analytics data** (only if you allowed it) is kept for the period set in our Google Analytics account, no longer than 14 months, and the `_ga` cookies expire after two years or when you choose "Essential only".
+- **Web analytics data** (only if you allowed it) is kept for the period set in our analytics account, no longer than 14 months, and the `_ga` cookies expire after two years or when you choose "Essential only".
 
 ## Your choices and rights
 
