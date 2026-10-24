@@ -2,7 +2,7 @@ import CoreLocation
 import SwiftData
 import SwiftUI
 
-/// Saved places and work hours that classify new trips automatically.
+/// What classifies new trips automatically: routes the person classified before, then saved places and work hours.
 struct AutoClassificationView: View {
     @State private var rules = ClassificationRules.load()
     @State private var showingAddPlace = false
@@ -15,6 +15,14 @@ struct AutoClassificationView: View {
 
     var body: some View {
         Form {
+            Section {
+                Text("When you classify a trip, later trips on the same route get the same classification: about the same start and end (within roughly 150 m), in either direction. If you have classified a route both ways, or never, nothing is guessed from it. Saved places and work hours below apply to routes you have never classified.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            } header: {
+                Text("Routes You Have Classified")
+            }
+
             Section {
                 Toggle("Use work hours", isOn: $rules.workHoursEnabled)
                 if rules.workHoursEnabled {
@@ -48,7 +56,6 @@ struct AutoClassificationView: View {
 
             Section {
                 Button("Apply to Unclassified Trips") { applyToExisting() }
-                    .disabled(rules.isEmpty)
                 if let appliedCount {
                     Text("\(appliedCount) trip(s) classified.")
                         .foregroundStyle(.secondary)
@@ -70,7 +77,8 @@ struct AutoClassificationView: View {
         let trips = (try? modelContext.fetch(FetchDescriptor<Trip>(
             predicate: #Predicate { $0.deletedAt == nil && !$0.isInProgress && !$0.isManuallyClassified }
         ))) ?? []
-        let changed = trips.filter { rules.apply(to: $0) }.count
+        let history = RouteMemory.history(in: modelContext)
+        let changed = trips.filter { rules.apply(to: $0, learningFrom: history) }.count
         try? modelContext.save()
         appliedCount = changed
     }

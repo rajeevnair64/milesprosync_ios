@@ -96,6 +96,32 @@ struct TripRecoveryTests {
         #expect(finished.endDate == finished.startDate)
     }
 
+    @Test func aFinishedTripOnAClassifiedRouteGetsThatClassification() async throws {
+        // The person classified this route (37.000 to 37.018 north) as Business before.
+        let context = ModelContext(container)
+        context.insert(Trip(
+            startDate: now.addingTimeInterval(-86_400), endDate: now.addingTimeInterval(-85_000), distanceMiles: 1.2,
+            startLatitude: 37, startLongitude: -122, endLatitude: 37.018, endLongitude: -122,
+            classification: .business, isManuallyClassified: true
+        ))
+        try context.save()
+        let id = try interruptedTrip(lastPointMinutesAgo: 60)
+
+        _ = await recorder.recoverInProgressTrips(now: now, resumeWindow: 10 * 60)
+
+        let finished = try trip(id)
+        #expect(finished.classification == .business)
+        #expect(!finished.isManuallyClassified)   // the app's label, not the person's
+    }
+
+    @Test func aFinishedTripOnANewRouteStaysUnclassified() async throws {
+        let id = try interruptedTrip(lastPointMinutesAgo: 60)
+
+        _ = await recorder.recoverInProgressTrips(now: now, resumeWindow: 10 * 60)
+
+        #expect(try trip(id).classification == .unclassified)
+    }
+
     @Test func noInterruptedTripsMeansNothingToDo() async {
         let recovery = await recorder.recoverInProgressTrips(now: now, resumeWindow: 10 * 60)
         #expect(recovery.resume == nil)
