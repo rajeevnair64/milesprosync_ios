@@ -2,7 +2,7 @@
 
 Effective date: October 11, 2026
 
-This policy explains what information MilesProSync (the "app") collects, how it is used, where it is stored, and the choices you have. The app is operated by AisleWeb ("we", "us"). If you have questions, contact us at admin@aisleweb.com.
+This policy explains what information MilesProSync (the "app") collects, how it is used, where it is stored, and the choices you have. The app is operated by Miles Pro Sync ("we", "us"). If you have questions, contact us at admin@milesprosync.com.
 
 ## Summary
 
@@ -159,8 +159,8 @@ We keep trip records for **four years from the date of each trip** for tax and a
 - **Your saved places, work hours, your list of purposes and rates:** you can change or delete these at any time in Settings. They never leave your device (your reimbursement settings are saved with your account if you use Website Sync; the purpose you pick for a trip is part of the trip).
 - **Subscriptions:** you can manage or cancel a subscription in your Apple ID account settings. Cancelling doesn't delete your trips.
 - **Leaving a team:** Settings → Team → Leave Team ends a team's access to your trips right away.
-- **Account deletion:** you can delete your website account in the app under Settings → Website Sync → Delete Website Account, or on the website's Account page. This removes your cloud login and email address and your subscription record immediately, ends any team membership, and turns off Website Sync; uploaded trip records are kept until four years after each trip's date, as described in "Retention", then erased. You can also contact us at admin@aisleweb.com.
-- Depending on where you live (for example, the European Economic Area, the United Kingdom, or California), you may have additional rights, such as to access, correct, delete, or port your personal information, or to object to or restrict certain processing. To exercise them, contact us at admin@aisleweb.com. We will respond within the time required by applicable law.
+- **Account deletion:** you can delete your website account in the app under Settings → Website Sync → Delete Website Account, or on the website's Account page. This removes your cloud login and email address and your subscription record immediately, ends any team membership, and turns off Website Sync; uploaded trip records are kept until four years after each trip's date, as described in "Retention", then erased. You can also contact us at admin@milesprosync.com.
+- Depending on where you live (for example, the European Economic Area, the United Kingdom, or California), you may have additional rights, such as to access, correct, delete, or port your personal information, or to object to or restrict certain processing. To exercise them, contact us at admin@milesprosync.com. We will respond within the time required by applicable law.
 
 ## Children
 
@@ -172,5 +172,5 @@ We may update this policy from time to time. We will change the effective date a
 
 ## Contact
 
-AisleWeb
-admin@aisleweb.com
+Miles Pro Sync
+admin@milesprosync.com
