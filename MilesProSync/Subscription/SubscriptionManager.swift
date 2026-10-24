@@ -16,12 +16,15 @@ final class SubscriptionManager {
     private(set) var errorMessage: String?
     /// The signed Team transaction currently in force, for the website (nil without a Team plan).
     private(set) var teamTransaction: String?
+    // TODO(remove after debugging): the two summaries below are shown on the plans screen only to diagnose
+    // a plan switch that doesn't show up. Remove them, their two Text lines in SubscriptionView, and the
+    // product IDs in `loadProducts`' error messages before release.
+    /// Temporary: what the App Store listed on the last refresh.
+    private(set) var entitlementSummary = ""
+    /// Temporary: the App Store's subscription status and the plan it renews as.
+    private(set) var switchSummary = ""
     /// A plan the subscription will change to at its next renewal (the App Store defers some
     /// switches), and the date it takes over; nil when none is scheduled.
-    /// Temporary: what the App Store listed on the last refresh, shown on the plans screen to
-    /// diagnose a switch that doesn't show up.
-    private(set) var entitlementSummary = ""
-    private(set) var switchSummary = ""
     private(set) var pendingProductID: String?
     private(set) var pendingSwitchDate: Date?
 

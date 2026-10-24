@@ -10,7 +10,7 @@ This policy explains what information MilesProSync (the "app") collects, how it 
 - You do not need an account to use the app. Your trips, saved places, trip purposes and settings are stored on your device.
 - Website Sync is optional. Only if you turn it on by signing in with Apple are your trips (including their GPS routes) uploaded to our cloud database, so you can view them on the MilesProSync website.
 - When you delete a trip, it is hidden from you but kept as a record on your device and in our cloud database.
-- Subscriptions and the one-time five-year purchase are bought through Apple's in-app purchase. New users get a one-day free trial; after that the app needs a subscription or the five-year purchase to record new drives.
+- Subscriptions and the one-time five-year purchase are bought through Apple's in-app purchase. New users get a 30-day free trial; after that the app needs a subscription or the five-year purchase to record new drives.
 - Teams are optional. If you join one, only your **Business** trips that end while you are a member are shown to the team. Personal and unclassified trips are never shown to it.
 - We do not sell your data, show ads, use third-party analytics, or track you across other companies' apps and websites.
 

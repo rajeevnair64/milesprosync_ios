@@ -85,6 +85,51 @@ struct NearestAddressTests {
         let address = await service.reverseGeocode(latitude: origin.latitude, longitude: origin.longitude)
         #expect(address == nil)
     }
+
+    @Test func lookupsAreSpacedByTheMinimumInterval() async {
+        let log = LookupLog()
+        let service = GeocodingService(lookup: { location in
+            let number = await log.record()
+            // The exact point has no house number, so the first neighbour is tried too.
+            return AddressCandidate(
+                parts: AddressParts(subThoroughfare: number > 1 ? "7" : nil, thoroughfare: "Elm St", locality: "Town", administrativeArea: "CA"),
+                location: location
+            )
+        }, minimumInterval: .milliseconds(150))
+
+        _ = await service.reverseGeocode(latitude: origin.latitude, longitude: origin.longitude)
+
+        // The exact point, then the neighbours of the first ring: every lookup waits for the interval.
+        let times = await log.times
+        #expect(times.count >= 2)
+        for (earlier, later) in zip(times, times.dropFirst()) {
+            #expect(later - earlier >= .milliseconds(140))
+        }
+    }
+
+    @Test func neighbourProbingStopsWhenLookupsKeepFailing() async {
+        let log = LookupLog()
+        let service = GeocodingService(lookup: { location in
+            let number = await log.record()
+            guard number == 1 else { return nil }
+            return AddressCandidate(parts: AddressParts(thoroughfare: "Rural Rd", locality: "Town", administrativeArea: "CA"), location: location)
+        })
+
+        let address = await service.reverseGeocode(latitude: origin.latitude, longitude: origin.longitude)
+
+        #expect(address == "Rural Rd, Town, CA")
+        // The exact point, then three failed neighbours: not all eight.
+        #expect(await log.times.count == 4)
+    }
+}
+
+private actor LookupLog {
+    private(set) var times: [ContinuousClock.Instant] = []
+    /// Records a lookup and returns how many have happened, this one included.
+    func record() -> Int {
+        times.append(.now)
+        return times.count
+    }
 }
 
 private final class LockedCounter: @unchecked Sendable {

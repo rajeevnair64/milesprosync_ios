@@ -75,8 +75,6 @@ final class TripSyncService {
     @ObservationIgnored private var signOutTask: Task<Void, Never>?
     @ObservationIgnored private var saveObserver: (any NSObjectProtocol)?
 
-    /// Trips carry their full GPS route, so batches stay small to keep each request modest.
-    private static let batchSize = 10
     private static let lastUserIDKey = "sync.lastUserID"
     /// The account whose trips still need pulling down. Set on sign-in, cleared once every page has
     /// been stored, so a restore cut short (offline, app closed) resumes on the next sync.
@@ -342,9 +340,9 @@ final class TripSyncService {
             return
         }
 
-        for start in stride(from: 0, to: pending.count, by: Self.batchSize) {
+        // Trips carry their full GPS route, so requests are limited by size as well as by count.
+        for batch in UploadBatching.batches(pending, size: { $0.payload.estimatedBytes }) {
             if Task.isCancelled { return }
-            let batch = Array(pending[start..<min(start + Self.batchSize, pending.count)])
             do {
                 try await client.upsertTrips(batch.map(\.payload))
                 guard epoch == accountEpoch else { return }
