@@ -108,7 +108,38 @@ actor TripRecorder {
         trip.distanceMiles = MileageCalculator.distanceMiles(for: trip.route)
         trip.isInProgress = false
         trip.revision += 1
-        ClassificationRules.load().apply(to: trip)
+        if !applyPreviousClassification(to: trip) {
+            ClassificationRules.load().apply(to: trip)
+        }
+    }
+
+    /// Trips whose start and end are within this distance of another trip's count as the same route.
+    static let sameRouteMeters = 150.0
+
+    /// If an earlier trip ran between the same start and end, gives this one the classification
+    /// the user last chose for that route (never "Unclassified"). Returns whether it applied one.
+    @discardableResult
+    private func applyPreviousClassification(to trip: Trip) -> Bool {
+        guard !trip.isManuallyClassified else { return false }
+        let id = trip.id
+        let descriptor = FetchDescriptor<Trip>(
+            predicate: #Predicate { !$0.isInProgress && $0.isManuallyClassified && $0.deletedAt == nil && $0.id != id },
+            sortBy: [SortDescriptor(\.startDate, order: .reverse)]
+        )
+        guard let candidates = try? modelContext.fetch(descriptor) else { return false }
+        func near(_ a: CLLocationCoordinate2D, _ b: CLLocationCoordinate2D) -> Bool {
+            CLLocation(latitude: a.latitude, longitude: a.longitude)
+                .distance(from: CLLocation(latitude: b.latitude, longitude: b.longitude)) <= Self.sameRouteMeters
+        }
+        guard let match = candidates.first(where: {
+            $0.classification != .unclassified
+                && near($0.startCoordinate, trip.startCoordinate) && near($0.endCoordinate, trip.endCoordinate)
+        }) else { return false }
+        if trip.classification == match.classification { return true }
+        // Raw value: the `classification` setter would mark it as chosen by the user.
+        trip.classificationRaw = match.classification.rawValue
+        trip.revision += 1
+        return true
     }
 
     /// Stores looked-up addresses. A nil (failed lookup) never overwrites an address already
