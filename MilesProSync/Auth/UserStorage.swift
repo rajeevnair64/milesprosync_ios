@@ -115,6 +115,15 @@ enum UserStorage {
         }
     }
 
+    /// Moves auto-classification rules saved in the app-wide defaults into the account's own, for
+    /// the account that was using the app when they were stored there.
+    static func adoptLegacyClassificationRules(from legacy: UserDefaults, to defaults: UserDefaults) {
+        let key = ClassificationRules.storageKey
+        guard defaults.object(forKey: key) == nil, let value = legacy.object(forKey: key) else { return }
+        defaults.set(value, forKey: key)
+        legacy.removeObject(forKey: key)
+    }
+
     private static func adoptLegacySettings(from legacy: UserDefaults, to defaults: UserDefaults) {
         for key in [AppSettings.Key.countryCode, AppSettings.Key.mileageRate, AppSettings.Key.rateMode] {
             guard defaults.object(forKey: key) == nil, let value = legacy.object(forKey: key) else { continue }

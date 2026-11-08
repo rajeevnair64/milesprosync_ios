@@ -123,6 +123,9 @@ final class DriveDetectionService {
         }
     }
 
+    /// This account's auto-classification rules, read when a trip finishes so edits apply at once.
+    private var classificationRules: ClassificationRules { ClassificationRules.load(from: defaults) }
+
     private func resetAfterLosingAccess() {
         currentTripID = nil
         machine = DriveStateMachine()
@@ -134,7 +137,7 @@ final class DriveDetectionService {
     }
 
     private func finishStaleTrips() async {
-        let recovery = await recorder.recoverInProgressTrips(now: Date(), resumeWindow: 0)
+        let recovery = await recorder.recoverInProgressTrips(now: Date(), resumeWindow: 0, rules: classificationRules)
         guard !recovery.finished.isEmpty else { return }
         Task {
             for trip in recovery.finished {
@@ -157,7 +160,7 @@ final class DriveDetectionService {
     /// ago, finishes any interrupted longer ago, and fills in addresses that were never looked up.
     private func recoverAfterLaunch() async {
         let now = Date()
-        let recovery = await recorder.recoverInProgressTrips(now: now, resumeWindow: Self.resumeWindow)
+        let recovery = await recorder.recoverInProgressTrips(now: now, resumeWindow: Self.resumeWindow, rules: classificationRules)
         if let resume = recovery.resume {
             currentTripID = resume.tripID
             machine.resumeRecording(lastMovingAt: resume.lastActivityAt)
@@ -379,7 +382,7 @@ final class DriveDetectionService {
             case .finalizeTrip(let end, let endedAt):
                 guard let tripID = currentTripID else { continue }
                 currentTripID = nil
-                guard let endpoints = await recorder.finalizeTrip(tripID, endLocation: end, endedAt: endedAt) else { continue }
+                guard let endpoints = await recorder.finalizeTrip(tripID, endLocation: end, endedAt: endedAt, rules: classificationRules) else { continue }
                 // Not awaited: geocoding is a network call and shouldn't hold up the queue.
                 Task {
                     await self.lookUpAddresses(for: tripID, start: endpoints.start, end: endpoints.end, knownStart: endpoints.startAddress)

@@ -86,7 +86,10 @@ actor TripRecorder {
     /// Finalizes the trip and returns its endpoints so the caller can kick off reverse
     /// geocoding (a network call, done outside this actor).
     @discardableResult
-    func finalizeTrip(_ tripID: PersistentIdentifier, endLocation: CLLocation, endedAt: Date) -> TripEndpoints? {
+    func finalizeTrip(
+        _ tripID: PersistentIdentifier, endLocation: CLLocation, endedAt: Date,
+        rules: ClassificationRules = ClassificationRules()
+    ) -> TripEndpoints? {
         guard let trip = self[tripID, as: Trip.self] else { return nil }
         lastPersistedPointByTrip[tripID] = nil
         // A drive that never went anywhere (a false start) isn't worth a record.
@@ -96,19 +99,19 @@ actor TripRecorder {
             saveContext()
             return nil
         }
-        finish(trip, at: endLocation.coordinate, endedAt: endedAt)
+        finish(trip, at: endLocation.coordinate, endedAt: endedAt, rules: rules)
         saveContext()
         return TripEndpoints(tripID: tripID, start: trip.startCoordinate, end: trip.endCoordinate, startAddress: trip.startAddress)
     }
 
-    private func finish(_ trip: Trip, at end: CLLocationCoordinate2D, endedAt: Date) {
+    private func finish(_ trip: Trip, at end: CLLocationCoordinate2D, endedAt: Date, rules: ClassificationRules) {
         trip.endDate = max(endedAt, trip.startDate)
         trip.endLatitude = end.latitude
         trip.endLongitude = end.longitude
         trip.distanceMiles = MileageCalculator.distanceMiles(for: trip.route)
         trip.isInProgress = false
         trip.revision += 1
-        ClassificationRules.load().apply(to: trip)
+        rules.apply(to: trip)
     }
 
     /// Stores looked-up addresses. A nil (failed lookup) never overwrites an address already
@@ -133,7 +136,9 @@ actor TripRecorder {
     /// termination by iOS). The newest one is resumed if its last point is within `resumeWindow`,
     /// meaning the drive is probably still going. Every other one is finished where recording
     /// stopped: its last saved point and that point's time, not wherever the phone is now.
-    func recoverInProgressTrips(now: Date, resumeWindow: TimeInterval) -> TripRecovery {
+    func recoverInProgressTrips(
+        now: Date, resumeWindow: TimeInterval, rules: ClassificationRules = ClassificationRules()
+    ) -> TripRecovery {
         let descriptor = FetchDescriptor<Trip>(
             predicate: #Predicate { $0.isInProgress },
             sortBy: [SortDescriptor(\.startDate, order: .reverse)]
@@ -148,7 +153,7 @@ actor TripRecorder {
                 recovery.resume = (trip.persistentModelID, lastActivityAt)
                 continue
             }
-            finish(trip, at: lastPoint?.coordinate ?? trip.startCoordinate, endedAt: lastActivityAt)
+            finish(trip, at: lastPoint?.coordinate ?? trip.startCoordinate, endedAt: lastActivityAt, rules: rules)
             recovery.finished.append(TripEndpoints(
                 tripID: trip.persistentModelID, start: trip.startCoordinate, end: trip.endCoordinate,
                 startAddress: trip.startAddress

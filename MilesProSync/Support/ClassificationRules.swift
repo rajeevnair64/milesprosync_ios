@@ -61,13 +61,18 @@ struct ClassificationRules: Codable, Equatable {
         return true
     }
 
-    static func load(from defaults: UserDefaults = .standard) -> ClassificationRules {
-        guard let data = defaults.data(forKey: storageKey),
-              let rules = try? JSONDecoder().decode(ClassificationRules.self, from: data) else { return ClassificationRules() }
-        return rules
+    /// Rules are per account, so callers pass the account's defaults.
+    static func load(from defaults: UserDefaults) -> ClassificationRules {
+        decode(defaults.data(forKey: storageKey))
     }
 
-    func save(to defaults: UserDefaults = .standard) {
-        defaults.set(try? JSONEncoder().encode(self), forKey: Self.storageKey)
+    static func decode(_ data: Data?) -> ClassificationRules {
+        data.flatMap { try? JSONDecoder().decode(ClassificationRules.self, from: $0) } ?? ClassificationRules()
+    }
+
+    var encoded: Data { (try? JSONEncoder().encode(self)) ?? Data() }
+
+    func save(to defaults: UserDefaults) {
+        defaults.set(encoded, forKey: Self.storageKey)
     }
 }
