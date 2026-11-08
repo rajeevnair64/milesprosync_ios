@@ -4,7 +4,9 @@ import SwiftUI
 
 /// Saved places and work hours that classify new trips automatically.
 struct AutoClassificationView: View {
-    @State private var rules = ClassificationRules.load()
+    // Read and written through the account's own defaults (`defaultAppStorage` in RootView).
+    @AppStorage(ClassificationRules.storageKey) private var storedRules = Data()
+    @State private var rules = ClassificationRules()
     @State private var showingAddPlace = false
     @State private var appliedCount: Int?
     @Environment(\.modelContext) private var modelContext
@@ -60,7 +62,8 @@ struct AutoClassificationView: View {
         .brandedBackground()
         .navigationTitle("Auto-Classification")
         .navigationBarTitleDisplayMode(.inline)
-        .onChange(of: rules) { rules.save() }
+        .onAppear { rules = ClassificationRules.decode(storedRules) }
+        .onChange(of: rules) { storedRules = rules.encoded }
         .sheet(isPresented: $showingAddPlace) {
             AddPlaceView { rules.places.append($0) }
         }

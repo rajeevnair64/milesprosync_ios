@@ -18,10 +18,6 @@ final class SubscriptionManager {
     private(set) var teamTransaction: String?
     /// A plan the subscription will change to at its next renewal (the App Store defers some
     /// switches), and the date it takes over; nil when none is scheduled.
-    /// Temporary: what the App Store listed on the last refresh, shown on the plans screen to
-    /// diagnose a switch that doesn't show up.
-    private(set) var entitlementSummary = ""
-    private(set) var switchSummary = ""
     private(set) var pendingProductID: String?
     private(set) var pendingSwitchDate: Date?
 
@@ -83,17 +79,16 @@ final class SubscriptionManager {
         do {
             let loaded = try await Product.products(for: ProductID.store)
             products = loaded.sorted { $0.price > $1.price }
-            let missing = ProductID.store.filter { id in !loaded.contains { $0.id == id } }
             errorMessage = if loaded.isEmpty {
-                "Plans aren't available from the App Store right now. Try again in a moment.\n\nApp Store returned 0 of \(ProductID.store.count) products. Missing: \(missing.joined(separator: ", "))"
-            } else if !missing.isEmpty {
-                "Some plans aren't available from the App Store.\n\nReturned: \(loaded.map(\.id).sorted().joined(separator: ", "))\nMissing: \(missing.joined(separator: ", "))"
+                "Plans aren't available from the App Store right now. Try again in a moment."
+            } else if loaded.count < ProductID.store.count {
+                "Some plans aren't available from the App Store right now."
             } else {
                 nil
             }
             await refreshPendingSwitch()
         } catch {
-            errorMessage = "Couldn't load subscription options. Check your connection and try again.\n\n\(error.localizedDescription)"
+            errorMessage = "Couldn't load subscription options. Check your connection and try again."
         }
     }
 
@@ -157,10 +152,8 @@ final class SubscriptionManager {
         var results: [VerificationResult<Transaction>] = []
         for await result in Transaction.currentEntitlements { results.append(result) }
         if let purchase { results.append(purchase) }
-        var seen: [String] = []
         for result in results {
             guard case .verified(let transaction) = result, transaction.revocationDate == nil else { continue }
-            seen.append("\(transaction.productID.split(separator: ".").suffix(2).joined(separator: ".")) until \(transaction.expirationDate?.formatted(date: .omitted, time: .standard) ?? "-")")
             switch transaction.productID {
             case ProductID.fiveYear:
                 // originalPurchaseDate is the same on every device and after a restore. The
@@ -179,8 +172,6 @@ final class SubscriptionManager {
             }
         }
         let plan = best.flatMap { Plan(productID: $0.transaction.productID) }
-        entitlementSummary = "Apple lists: " + (seen.isEmpty ? "nothing" : seen.joined(separator: "; "))
-            + ". Using: " + (best.map { $0.transaction.productID.split(separator: ".").suffix(2).joined(separator: ".") } ?? "none")
         AccessStore.saveSubscription(
             until: best?.transaction.expirationDate, plan: plan, productID: best?.transaction.productID,
             defaults: defaults
@@ -205,19 +196,8 @@ final class SubscriptionManager {
     /// Looks for a switch the App Store has scheduled for the next renewal, so the plans screen
     /// can say so instead of still showing the old plan with no explanation.
     func refreshPendingSwitch() async {
-        guard let groupID = products.compactMap({ $0.subscription?.subscriptionGroupID }).first else {
-            switchSummary = "Switch check: plans not loaded."
-            return
-        }
-        guard let statuses = try? await Product.SubscriptionInfo.status(for: groupID) else {
-            switchSummary = "Switch check: status lookup failed."
-            return
-        }
-        switchSummary = "Switch check: " + (statuses.isEmpty ? "no status" : statuses.map { status in
-            let renewal = status.renewalInfo.unsafePayloadValue
-            let next = renewal.autoRenewPreference?.split(separator: ".").suffix(2).joined(separator: ".") ?? "-"
-            return "\(status.state.localizedDescription), renews as \(next)"
-        }.joined(separator: "; "))
+        guard let groupID = products.compactMap({ $0.subscription?.subscriptionGroupID }).first,
+              let statuses = try? await Product.SubscriptionInfo.status(for: groupID) else { return }
         var pending: (id: String, date: Date)?
         for status in statuses where status.state == .subscribed {
             guard case .verified(let renewal) = status.renewalInfo,

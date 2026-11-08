@@ -49,6 +49,8 @@ final class UserSession: Identifiable {
         let accountDefaults = defaults
         driveDetection.defersPermissionPrompt = { !Onboarding.isComplete(defaults: accountDefaults) }
         driveDetection.onTripFinished = { tripSync.syncNow() }
+        // Auto-classification rules were once kept in the app-wide defaults.
+        UserStorage.adoptLegacyClassificationRules(from: legacyDefaults, to: defaults)
         // Settings from before reimbursement methods existed: settle which one this account was using.
         AppSettings.resolveRateMode(defaults: defaults)
     }
@@ -175,9 +177,11 @@ final class AppSession {
             return
         }
         if !account.isLinked {
-            account = adoptingStoreFromBeforeSignInWasOptional(account, appleUserID: credential.userID)
-            account.appleUserID = credential.userID
-            account.email = credential.email ?? account.email
+            account = DeviceAccount(
+                storageKey: switchToStoreFromBeforeSignInWasOptional(account, appleUserID: credential.userID),
+                appleUserID: credential.userID,
+                email: credential.email ?? account.email
+            )
             accountStore.save(account)
             self.account = account
         }
@@ -201,20 +205,21 @@ final class AppSession {
 
     /// Someone who signed out while sign-in was required has their trips in a store keyed by
     /// their Apple user ID, not in the device store created since. If the device store is still
-    /// empty, switch to theirs so linking the same Apple ID brings those trips back.
-    private func adoptingStoreFromBeforeSignInWasOptional(_ account: DeviceAccount, appleUserID: String) -> DeviceAccount {
+    /// empty, switch to theirs so linking the same Apple ID brings those trips back. Returns the
+    /// storage key the account should use from now on.
+    private func switchToStoreFromBeforeSignInWasOptional(_ account: DeviceAccount, appleUserID: String) -> String {
         guard account.storageKey != appleUserID,
               UserStorage.storeExists(for: appleUserID, root: storageRoot),
-              current?.tripCount == 0 else { return account }
+              current?.tripCount == 0 else { return account.storageKey }
         current?.stop()
         current = nil
         activate(storageKey: appleUserID)
         guard current != nil else {
             // Their store wouldn't open: carry on with the device store rather than leave no session.
             activate(storageKey: account.storageKey)
-            return account
+            return account.storageKey
         }
-        return DeviceAccount(storageKey: appleUserID, appleUserID: nil, email: account.email)
+        return appleUserID
     }
 
     /// Turns off website sync: stops uploading and forgets the cloud session. Recording carries
